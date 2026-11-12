@@ -1,0 +1,249 @@
+/* ===== v54 设计系统 · 组件层（css/components.css） =====
+ * 约定（docs/revamp-2026-10-11/02-设计系统组件化.md §2.2/§2.3）：
+ *  - 只新增 c- 前缀组件类，旧类随页面迁移自然消亡，不做全站改名
+ *  - 颜色一律 var() 取色（禁字面色值，天然适配暗色与主题色）
+ *  - 交互目标内置 ≥44px 触控高度；焦点环由 theme/ 全局 :focus-visible 提供
+ *  - 骨架/弹层动效尊重 prefers-reduced-motion（theme/ 全局降级）
+ * 依赖 theme/ 的补充变量：--mask / --skel-base / --skel-shine
+ */
+
+/* ---------- 弹窗 c-modal ---------- */
+.c-modal-mask {
+    position: fixed; inset: 0; z-index: var(--z-c-modal);
+    background: var(--mask);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    animation: cMaskIn .15s ease-out;
+}
+@keyframes cMaskIn { from { opacity: 0; } to { opacity: 1; } }
+.c-modal-card {
+    background: var(--card-bg); color: var(--text-primary);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    width: 460px; max-width: 100%; max-height: 88vh; overflow-y: auto;
+    padding: 24px;
+    animation: cCardIn .18s var(--ease-out);
+}
+@keyframes cCardIn { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+.c-modal-card.c-modal-sm { width: 360px; }
+.c-modal-card.c-modal-lg { width: 640px; }
+.c-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.c-modal-title { font-size: 16px; font-weight: 600; }
+.c-modal-x {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-secondary); font-size: 20px; line-height: 1;
+    min-width: 44px; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin: -10px -10px -10px 0;
+}
+.c-modal-x:hover { color: var(--danger); }
+.c-modal-body { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
+.c-modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.c-modal-foot .c-btn { flex: 0 0 auto; }
+
+/* ---------- 按钮 c-btn（组件内置：44px + 全局焦点环） ---------- */
+.c-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 0 18px;
+    border: 1px solid var(--border-color); border-radius: var(--radius);
+    background: var(--card-bg); color: var(--text-primary);
+    font: inherit; font-size: 14px; cursor: pointer;
+    transition: background .15s, border-color .15s, transform .12s var(--ease-snap);
+    -webkit-tap-highlight-color: transparent;
+}
+.c-btn:hover { border-color: var(--primary); color: var(--primary-text); background: var(--primary-light); }
+.c-btn:active { transform: scale(.96); }
+.c-btn:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.4); }
+.c-btn-primary { background: var(--grad-brand); border-color: transparent; color: var(--text-on-primary); }
+.c-btn-primary:hover { background: var(--grad-brand); border-color: transparent; color: var(--text-on-primary); filter: brightness(1.08); }
+.c-btn-danger { background: var(--danger); border-color: transparent; color: var(--text-on-primary); }
+.c-btn-danger:hover { background: var(--danger-hover); border-color: transparent; color: var(--text-on-primary); }
+
+/* ---------- 确认框：刻意不在这里实现 ----------
+ * uiConfirm 委托 common.js 的 confirmModal（见 public/js/ui.js 文件头「确认框不在此重复造」）。
+ * 这里曾有一套 .c-confirm / .c-confirm-msg / .c-confirm-note 规则，全站零引用，
+ * v1.48.39 删除：两套确认框意味着焦点圈、Esc、危险色各走一套，
+ * 而回归测试只覆盖真正被调用的那一套——留着比删掉更危险。 */
+
+/* ---------- 空态 c-empty ---------- */
+.c-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px 0; text-align: center;
+    font-size: 13px; color: var(--text-secondary);
+}
+.c-empty-icon { display: inline-flex; font-size: 18px; line-height: 1; }
+.c-empty-icon svg { width: 20px; height: 20px; }
+.c-empty-text { display: inline; }
+.c-empty-action {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 0 10px;
+    font-size: 13px; color: var(--primary-text);
+    text-decoration: none; cursor: pointer;
+    background: none; border: none; font-family: inherit;
+}
+.c-empty-action:hover { color: var(--primary-text-hover); text-decoration: underline; }
+
+/* ---------- 空态（块级）c-empty-block ----------
+ * 和上面的行内空态是两个东西，不是同一个东西的加大号：
+ *   行内 = 列表某一行 / 表单字段下方，只回答「这里为什么空」，一句话就够；
+ *   块级 = 卡片正文整块为空，要回答「这是什么空」+「怎么开始」，标题与描述必须两级。
+ * 拆成两个类而不是加 padding 参数，是因为信息量不同——硬合成一个，
+ * 要么行内空态被迫带标题，要么块级空态丢描述。
+ * 迁移背景：全站曾有 28 处 .empty-state（10 个页面 + footprint.js），都是
+ * 「图标圆底 + 标题 + 描述 + 按钮」四段式，直接塞进 .c-empty 会掉信息。
+ * v1.48.39 全部迁到这两级，旧类的样式规则已从 theme/ 删除，
+ * 由 tests/design-system.test.js ⑤ 全站扫描防回潮（一处都不许留）。
+ * 动作按钮复用 .c-btn（主）与 .c-btn（次要），不另造一套按钮样式。 */
+.c-empty-block { gap: 0; padding: 44px 20px; }
+.c-empty-block .c-empty-icon {
+    width: 64px; height: 64px; border-radius: var(--radius-circle);
+    background: rgba(var(--primary-rgb), .08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; margin: 0 auto 14px;
+}
+.c-empty-block .c-empty-icon svg { width: 28px; height: 28px; }
+.c-empty-block .c-empty-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0 0 6px; }
+.c-empty-block .c-empty-text { display: block; font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+.c-empty-block .c-btn { text-decoration: none; } /* <a class="c-btn"> 不要下划线 */
+.c-empty-block > :last-child { margin-bottom: 0; } /* 无按钮时不留下悬空间距 */
+
+/* ---------- 标签 chip ---------- */
+.c-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 6px 3px 10px; margin: 0 4px 4px 0;
+    background: var(--bg-inset); color: var(--text-primary);
+    border-radius: var(--radius-pill); font-size: 12.5px; line-height: 1.4;
+}
+.c-chip-text { white-space: nowrap; }
+.c-chip-x {
+    position: relative;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; padding: 0;
+    border: none; border-radius: var(--radius-circle);
+    background: transparent; color: var(--text-secondary);
+    font-size: 14px; line-height: 1; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.c-chip-x:hover { background: var(--primary-light); color: var(--primary-text); }
+/* 命中区扩展到 44px（视觉尺寸不变） */
+.c-chip-x::after { content: ""; position: absolute; inset: -12px; }
+
+/* ---------- 统计卡 c-stat ---------- */
+.c-stat { display: flex; flex-direction: column; gap: 2px; }
+.c-stat-label { font-size: 12px; color: var(--text-secondary); }
+.c-stat-num { font-size: 22px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.c-stat-delta { font-size: 12px; }
+.c-stat-delta.c-up { color: var(--amount-in); }
+.c-stat-delta.c-down { color: var(--amount-out); }
+.c-stat-delta.c-flat { color: var(--text-secondary); }
+
+/* ---------- 骨架屏 c-skel ---------- */
+.c-skel {
+    position: relative; overflow: hidden;
+    background: var(--skel-base); border-radius: var(--radius);
+}
+.c-skel::after {
+    content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--skel-shine), transparent);
+    animation: cSkel 1.4s infinite;
+}
+@keyframes cSkel { to { transform: translateX(100%); } }
+
+/* ---------- 表单行 c-form-row ---------- */
+.c-form-row { display: grid; gap: 6px; margin-bottom: 14px; }
+.c-form-row > .c-label { font-size: 13px; color: var(--text-secondary); }
+.c-form-row .c-field input,
+.c-form-row .c-field select,
+.c-form-row .c-field textarea {
+    width: 100%; min-height: 44px; padding: 10px 12px;
+    border: 1px solid var(--border-color); border-radius: var(--radius);
+    background: var(--input-bg); color: var(--text-primary);
+    font: inherit; font-size: 14px;
+}
+.c-form-row .c-field textarea { min-height: 88px; resize: vertical; }
+
+/* ---------- 分段标题 c-section-row ---------- */
+.c-section-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin: 0 0 12px;
+}
+.c-section-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.c-section-more {
+    position: relative;
+    display: inline-flex; align-items: center;
+    font-size: 12.5px; color: var(--primary-text);
+    text-decoration: none;
+}
+.c-section-more:hover { color: var(--primary-text-hover); }
+/* 命中区扩展到 44px（视觉尺寸不变） */
+.c-section-more::after { content: ""; position: absolute; inset: -12px; }
+
+/* ---------- 日期选择器 c-dp（PC 端升级原生 date；截图样式照搬：下拉日历 + 清空/此刻/确定） ---------- */
+.c-dp-native { display: none !important; } /* 被代理的原生 date input：隐藏但保留作真实值载体 */
+.c-dp-wrap { position: relative; display: inline-flex; align-items: center; width: 100%; }
+.c-dp-fake {
+    width: 100%; min-height: 44px; padding: 10px 36px 10px 12px;
+    border: 1px solid var(--border-color); border-radius: var(--radius);
+    background: var(--input-bg); color: var(--text-primary);
+    font: inherit; font-size: 14px; cursor: pointer;
+}
+.c-dp-fake[data-empty="1"] { color: var(--text-secondary); }
+.c-dp-fake:hover { border-color: var(--primary); }
+.c-dp-fake:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.c-dp-fake[disabled] { opacity: .5; cursor: not-allowed; filter: grayscale(.4); }
+.c-dp-ico {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--text-secondary); cursor: pointer; padding: 0;
+}
+.c-dp-ico svg { width: 16px; height: 16px; }
+/* 命中区扩展到 44px（视觉 32px 不变） */
+.c-dp-ico::after { content: ""; position: absolute; inset: -6px; }
+.c-dp-pop {
+    position: fixed; z-index: var(--z-datepicker); width: 348px; max-width: calc(100vw - 16px);
+    background: var(--card-bg); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg); padding: 12px;
+    animation: cCardIn .15s var(--ease-out);
+    font-size: 14px;
+}
+.c-dp-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 8px; }
+.c-dp-title { font-size: 14px; font-weight: 600; text-align: center; flex: 1; }
+.c-dp-nav {
+    min-width: 44px; min-height: 44px; flex: 0 0 auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: var(--text-secondary);
+    cursor: pointer; border-radius: var(--radius); font-size: 14px; font-family: inherit; padding: 0;
+}
+.c-dp-nav:hover { background: var(--primary-light); color: var(--primary-text); }
+.c-dp-week, .c-dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.c-dp-week span { text-align: center; font-size: 12px; color: var(--text-secondary); padding: 4px 0; }
+.c-dp-day {
+    min-width: 0; min-height: 44px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: var(--radius); background: transparent;
+    color: var(--text-primary); font: inherit; font-size: 13.5px; cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+.c-dp-day:hover { background: var(--primary-light); }
+.c-dp-day.out { color: var(--text-secondary); opacity: .5; }
+.c-dp-day.today { box-shadow: inset 0 0 0 1px var(--primary); }
+.c-dp-day.sel { background: var(--primary); color: var(--text-on-primary); font-weight: 600; }
+.c-dp-day:disabled { opacity: .3; cursor: not-allowed; }
+.c-dp-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.c-dp-btn {
+    min-height: 44px; padding: 0 14px;
+    border: 1px solid var(--border-color); border-radius: var(--radius);
+    background: var(--card-bg); color: var(--text-primary);
+    font: inherit; font-size: 13px; cursor: pointer;
+}
+.c-dp-btn:hover { border-color: var(--primary); color: var(--primary-text); background: var(--primary-light); }
+.c-dp-btn.c-dp-ok { background: var(--grad-brand); border-color: transparent; color: var(--text-on-primary); }
+.c-dp-btn.c-dp-ok:hover { color: var(--text-on-primary); filter: brightness(1.08); }
+
+/* ---------- 移动端适配 ---------- */
+@media (max-width: 640px) {
+    .c-modal-mask { padding: 14px; align-items: flex-end; }
+    .c-modal-card, .c-modal-card.c-modal-sm, .c-modal-card.c-modal-lg { width: 100%; padding: 18px 16px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 86vh; }
+    .c-modal-foot { flex-direction: column-reverse; }
+    .c-modal-foot .c-btn { width: 100%; }
+}

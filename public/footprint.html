@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>足迹回顾 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* ---------- 我的足迹 · 页面专属样式（全部走主题变量，自动适配深色） ---------- */
+        .fp-grid { display: grid; grid-template-columns: 1fr 372px; gap: 16px; align-items: start; }
+        @media (max-width: 1080px) { .fp-grid { grid-template-columns: 1fr; } }
+
+        .fp-pane { background: var(--card-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 14px; }
+        .fp-pane + .fp-pane { margin-top: 16px; }
+        .fp-head {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 14px; font-weight: 600; color: var(--text-primary);
+            margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color);
+        }
+        .fp-head .cnt { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+
+        /* 地图 */
+        .fp-map { position: relative; height: 460px; border-radius: var(--radius); overflow: hidden; background: var(--bg-inset); }
+        #tmap { width: 100%; height: 460px; display: none; }
+        .fp-map-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; text-align: center; padding: 24px; }
+        .fp-map-empty .big { font-size: 40px; }
+        .fp-map-empty .t { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .fp-map-empty .d { font-size: 12.5px; color: var(--text-secondary); line-height: 1.8; max-width: 420px; }
+        .fp-hint { font-size: 12px; color: var(--text-secondary); margin-top: 10px; line-height: 1.7; }
+        .fp-hint a { color: var(--primary); }
+
+        /* ===== G1 省份填色图（高德对标 · 本地 SVG，无需地图 Key） ===== */
+        #cnMapWrap { position: relative; width: 100%; height: 460px; }
+        #cnMap { width: 100%; height: 100%; display: block; }
+        #cnMap .cn-prov { fill: var(--border-color); stroke: var(--card-bg); stroke-width: .6; cursor: pointer; transition: fill .15s; }
+        #cnMap .cn-prov:hover { fill: rgba(var(--primary-rgb), .38); }
+        #cnMap .cn-prov.lit { fill: var(--primary); }
+        #cnMap .cn-prov.lit:hover { fill: rgba(var(--primary-rgb), .8); }
+        /* 南海诸岛角标（标准全图画法：右下角方框，含九段线） */
+        #cnInset { position: absolute; right: 10px; bottom: 10px; width: 118px; height: 160px; border: 1px solid var(--border-color); background: var(--card-bg); border-radius: 6px; overflow: hidden; }
+        #cnInsetMap { width: 100%; height: 100%; display: block; }
+        #cnInsetMap .cn-inset-prov { fill: var(--border-color); stroke: var(--card-bg); stroke-width: .6; }
+        #cnInsetMap .cn-inset-prov.lit { fill: var(--primary); }
+        #cnInsetMap .cn-inset-jd { fill: none; stroke: var(--text-secondary); stroke-width: .5; }
+        #cnInset .cn-inset-cap { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--text-secondary); pointer-events: none; }
+        /* 省份悬浮提示 */
+        #cnTip { position: absolute; display: none; z-index: 5; pointer-events: none; background: var(--card-bg); border: 1px solid var(--border-color); box-shadow: var(--shadow); border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.7; max-width: 240px; }
+        #cnTip b { display: block; font-size: 13px; color: var(--text-primary); }
+        #cnTip span { color: var(--text-secondary); }
+        /* G4 省份下钻弹层 */
+        .pm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+        .pm-stat { text-align: center; padding: 12px 6px; background: var(--bg-inset); border-radius: 10px; }
+        .pm-stat .v { font-size: 15px; font-weight: 700; color: var(--primary); }
+        .pm-stat .l { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .pm-cities { display: flex; flex-direction: column; gap: 6px; }
+        .pm-city { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; transition: border-color .15s; }
+        .pm-city:hover { border-color: var(--primary); }
+        .pm-city .n { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .pm-city .n i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--text-secondary); background: var(--bg-inset); border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
+        .pm-city .m { font-size: 12px; color: var(--text-secondary); text-align: right; }
+
+        /* 图层/底图切换 chip（地图控件行）：与 location.html 的 .ma-chip 风格保持一致 */
+        .fp-ctl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+        .fp-ctl-row .fp-ctl-label { font-size: 12px; color: var(--text-secondary); margin-right: 2px; }
+        .fp-chip {
+            font: inherit; font-size: 12px; color: var(--text-secondary); background: var(--bg-inset);
+            border: 1px solid var(--border-color); border-radius: 999px; padding: 5px 12px; cursor: pointer;
+            transition: color .15s, background .15s, border-color .15s;
+        }
+        .fp-chip:hover { border-color: var(--primary); color: var(--primary); }
+        .fp-chip.active { color: #fff; background: var(--primary); border-color: transparent; font-weight: 600; }
+        /* 照片数据色点（v47）：20px 圆点 + padding 撑触控区 ≥44px */
+        .fp-dot-row { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+        .fp-dot {
+            width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; cursor: pointer;
+            /* 触控扩面：margin→padding + background-clip，视觉 20px 不变，热区 24px→48px */
+            padding: 12px; margin: 0; box-sizing: content-box; background-clip: content-box;
+            transition: transform .15s, border-color .15s;
+        }
+        .fp-dot:hover { transform: scale(1.15); }
+        .fp-dot.active { border-color: var(--text-primary); transform: scale(1.15); }
+
+        /* 省份覆盖 */
+        .prov-bar { height: 8px; border-radius: 999px; background: var(--bg-inset); overflow: hidden; margin-bottom: 12px; }
+        .prov-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), #3b82f6); transition: width .5s ease; }
+        .prov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 7px; }
+        .prov-chip {
+            border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 8px;
+            font-size: 12px; color: var(--text-secondary); background: var(--bg-inset);
+            display: flex; align-items: center; justify-content: space-between; gap: 4px;
+        }
+        .prov-chip.lit { background: rgba(var(--primary-rgb), .1); border-color: rgba(var(--primary-rgb), .45); color: var(--primary); font-weight: 600; }
+        .prov-chip .n { font-size: 12px; opacity: .85; }
+
+        /* 城市列表 */
+        .fp-city-list { max-height: 640px; overflow-y: auto; padding-right: 2px; }
+        .fp-prov-group { margin-bottom: 14px; }
+        .fp-prov-title {
+            font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            padding: 4px 2px 8px; display: flex; align-items: center; gap: 6px;
+        }
+        .fp-prov-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+        .fp-city {
+            border: 1px solid var(--border-color); border-radius: var(--radius);
+            padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
+            transition: border-color .15s, background .15s, transform .15s;
+        }
+        .fp-city:hover { border-color: var(--primary); transform: translateX(2px); }
+        .fp-city.active { border-color: var(--primary); background: rgba(var(--primary-rgb), .07); }
+        .fp-city-top { display: flex; align-items: center; gap: 8px; }
+        .fp-city-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+        .fp-city-flag {
+            font-size: 12px; padding: 1px 6px; border-radius: 999px;
+            background: rgba(var(--primary-rgb), .14); color: var(--primary); font-weight: 600;
+        }
+        .fp-city-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+        .fp-city-cover { width: 100%; height: 68px; object-fit: cover; border-radius: 8px; margin-top: 8px; border: 1px solid var(--border-color); }
+
+        /* 成就墙 */
+        .ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+        .ach {
+            border: 1px solid var(--border-color); border-radius: var(--radius); padding: 11px 12px;
+            background: var(--bg-inset); opacity: .55; transition: opacity .2s, border-color .2s;
+        }
+        .ach.done { opacity: 1; background: rgba(var(--primary-rgb), .08); border-color: rgba(var(--primary-rgb), .45); }
+        .ach-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .ach-ico { font-size: 20px; line-height: 1; filter: grayscale(1); }
+        .ach.done .ach-ico { filter: none; }
+        .ach-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .ach-desc { font-size: 12px; color: var(--text-secondary); }
+        .ach-prog { font-size: 12px; color: var(--primary); margin-top: 5px; font-weight: 600; }
+
+        /* ---------- 高德对标新增：高光日历 / 地点时间线 / 城市卡片网格（任务 #16） ---------- */
+        /* A 高光日历 */
+        .fc-wrap { display: grid; grid-template-columns: 1fr 268px; gap: 14px; align-items: start; }
+        @media (max-width: 1080px) { .fc-wrap { grid-template-columns: 1fr; } }
+        .fc-cal { min-width: 0; }
+        .fc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+        .fc-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+        .fc-title small { font-size: 12px; font-weight: 400; color: var(--text-secondary); margin-left: 6px; }
+        .fc-nav { display: flex; gap: 6px; }
+        .fc-nav button {
+            font: inherit; font-size: 13px; line-height: 1; width: 28px; height: 28px; padding: 0;
+            border: 1px solid var(--border-color); background: var(--bg-inset); color: var(--text-secondary);
+            border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .fc-nav button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+        .fc-nav button:disabled { opacity: .4; cursor: not-allowed; }
+        .fc-grid7 { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .fc-dow { text-align: center; font-size: 11.5px; color: var(--text-secondary); padding: 2px 0 4px; }
+        .fc-day {
+            position: relative; aspect-ratio: 1 / 1; min-width: 0; border-radius: 8px;
+            border: 1px solid transparent; background: var(--bg-inset);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+            font-size: 12.5px; color: var(--text-primary); cursor: default;
+        }
+        .fc-day.pad { background: transparent; border: none; }
+        .fc-day.has { cursor: pointer; border-color: rgba(var(--primary-rgb), .4); }
+        .fc-day.has:hover { border-color: var(--primary); }
+        .fc-day.today { outline: 1.5px solid var(--primary); outline-offset: -1.5px; }
+        .fc-day.sel { background: rgba(var(--primary-rgb), .16); border-color: var(--primary); font-weight: 700; }
+        .fc-day .n { font-weight: 600; }
+        /* 热度：1 条=浅、2-3 条=中、≥4 条=深（点大小 / 底色加深） */
+        .fc-day .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+        .fc-day.h1 { background: rgba(var(--primary-rgb), .12); }
+        .fc-day.h1 .dot { width: 5px; height: 5px; opacity: .7; }
+        .fc-day.h2 { background: rgba(var(--primary-rgb), .26); }
+        .fc-day.h2 .dot { width: 6px; height: 6px; }
+        .fc-day.h3 { background: rgba(var(--primary-rgb), .42); }
+        .fc-day.h3 .dot { width: 8px; height: 8px; box-shadow: 0 0 0 2px rgba(var(--primary-rgb), .25); }
+        .fc-day .badge {
+            position: absolute; top: 3px; right: 4px; font-size: 10px; font-weight: 700;
+            color: var(--primary); line-height: 1;
+        }
+        .fc-daylist { margin-top: 12px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
+        .fc-daylist .fc-dl-hd { font-size: 12.5px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .fc-point { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed var(--border-color); }
+        .fc-point:last-child { border-bottom: none; }
+        .fc-point .fc-dot { flex: none; width: 4px; align-self: stretch; min-height: 30px; border-radius: 2px; background: var(--primary); }
+        .fc-point .fc-pmain { flex: 1; min-width: 0; }
+        .fc-point .fc-pname { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fc-point .fc-pmeta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; overflow-wrap: anywhere; }
+        /* 心情文案条 */
+        .fc-moodbar {
+            border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; background: var(--bg-inset);
+        }
+        .fc-moodbar .lb { font-size: 11.5px; color: var(--text-secondary); margin-bottom: 5px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .fc-moodbar .txt {
+            font: inherit; font-size: 13px; color: var(--text-primary); width: 100%; border: none; background: transparent;
+            border-bottom: 1px dashed var(--border-color); padding: 3px 0; outline: none;
+        }
+        .fc-moodbar .txt:focus { border-bottom-color: var(--primary); }
+
+        /* B 地点维度时间线 */
+        .fp-place-list { max-height: 640px; overflow-y: auto; padding-right: 2px; }
+        .fp-place {
+            border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px;
+            cursor: pointer; transition: border-color .15s, background .15s, transform .15s; min-width: 0;
+        }
+        .fp-place:hover { border-color: var(--primary); transform: translateX(2px); }
+        .fp-place.open { border-color: var(--primary); background: rgba(var(--primary-rgb), .07); }
+        .fp-place-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .fp-place-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fp-place-badge {
+            flex: none; font-size: 11.5px; padding: 1px 8px; border-radius: 999px; font-weight: 700;
+            background: rgba(var(--primary-rgb), .14); color: var(--primary);
+        }
+        .fp-place-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--text-secondary); margin-top: 5px; }
+        .fp-place-visits { margin-top: 8px; border-top: 1px dashed var(--border-color); padding-top: 6px; }
+        .fp-visit { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--border-color); }
+        .fp-visit:last-child { border-bottom: none; }
+        .fp-visit .vmain { flex: 1; min-width: 0; }
+        .fp-visit .vt { font-size: 12.5px; color: var(--text-primary); }
+        .fp-visit .va { font-size: 12px; color: var(--text-secondary); margin-top: 1px; overflow-wrap: anywhere; }
+        .fp-visit .vmemo {
+            flex: none; font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+            border: 1px solid rgba(var(--primary-rgb), .45); background: rgba(var(--primary-rgb), .08); color: var(--primary);
+        }
+        .fp-visit .vmemo:hover { background: rgba(var(--primary-rgb), .18); }
+
+        /* C 城市卡片网格 */
+        .fp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+        @media (max-width: 640px) { .fp-cards { grid-template-columns: repeat(2, 1fr); } /* UI-51：奇数张时最后一张跨满整行，避免 2-2-1 孤半行 */ .fp-cards > :last-child:nth-child(odd) { grid-column: 1 / -1; } }
+        .fp-card {
+            position: relative; border-radius: var(--radius); overflow: hidden; cursor: pointer; min-width: 0;
+            border: 1px solid var(--border-color); padding: 12px 12px 10px; min-height: 96px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            transition: transform .15s, border-color .15s;
+        }
+        .fp-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        /* v1.48.37：卡片底色是按城市色相算的，原来固定白字 + 24% 白药丸，
+           在黄绿色相上只有约 2.0。改为由 JS 按色相算出 --fp-fg / --fp-pill 两档
+           （白字配深药丸，或深墨配浅药丸），保证卡片面与药丸面在渐变两端都 ≥4.5。 */
+        .fp-card .c-initial {
+            position: absolute; right: 6px; bottom: -8px; font-size: 54px; font-weight: 800; line-height: 1;
+            color: var(--fp-fg, #fff); opacity: .16; pointer-events: none; user-select: none;
+        }
+        .fp-card .c-name { font-size: 15px; font-weight: 700; color: var(--fp-fg, #fff); position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fp-card .c-prov {
+            align-self: flex-start; margin-top: 4px; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+            background: var(--fp-pill, rgba(0, 0, 0, .24)); color: var(--fp-fg, #fff); font-weight: 600; position: relative; z-index: 1;
+            max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .fp-card .c-meta { font-size: 11.5px; color: var(--fp-fg, #fff); opacity: .92; margin-top: 6px; position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; }
+        .fp-card .c-meta b { font-weight: 700; }
+        .fp-empty-mini { padding: 26px 10px; text-align: center; color: var(--text-secondary); font-size: 12.5px; }
+
+        /* 年度报告 */
+        .an-hero {
+            background: linear-gradient(135deg, rgba(var(--primary-rgb), .14), rgba(99, 102, 241, .14));
+            border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 16px;
+        }
+        .an-hero .yr { font-size: 30px; font-weight: 700; color: var(--primary); line-height: 1.1; }
+        .an-hero .sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+        .an-hero .line { font-size: 14px; color: var(--text-primary); margin-top: 12px; line-height: 1.9; }
+        .an-hero .line b { color: var(--primary); font-size: 16px; }
+        .an-nums { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .an-num { border: 1px solid var(--border-color); border-radius: var(--radius); padding: 10px 12px; text-align: center; }
+        .an-num .v { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+        .an-num .l { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .an-sec-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 16px 0 9px; }
+        .an-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+        .an-chip {
+            padding: 5px 11px; border-radius: 999px; font-size: 12.5px;
+            background: rgba(var(--primary-rgb), .1); color: var(--primary); border: 1px solid rgba(var(--primary-rgb), .35); font-weight: 600;
+        }
+        .an-months { display: flex; align-items: flex-end; gap: 4px; height: 90px; margin-top: 6px; }
+        .an-month { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: flex-end; height: 100%; }
+        .an-month i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--primary), rgba(var(--primary-rgb), .5)); min-height: 3px; }
+        .an-month span { font-size: 12px; color: var(--text-secondary); }
+        .an-list .an-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); padding: 5px 0; border-bottom: 1px dashed var(--border-color); }
+        .an-list .an-item:last-child { border-bottom: none; }
+        .an-list .an-item strong { color: var(--text-primary); font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* 城市选择下拉 */
+        .city-sug { border: 1px solid var(--border-color); border-radius: var(--radius); margin-top: 8px; max-height: 220px; overflow-y: auto; }
+        .city-sug .cs {
+            padding: 9px 11px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .city-sug .cs:last-child { border-bottom: none; }
+        .city-sug .cs:hover { background: var(--bg-inset); }
+        .city-sug .cs small { color: var(--text-secondary); font-size: 12px; }
+        .city-sug .cs.lit { opacity: .5; cursor: not-allowed; }
+        .city-sug .empty { padding: 12px; font-size: 12.5px; color: var(--text-secondary); text-align: center; }
+        .photo-viewer img { max-width: 100%; max-height: 76vh; border-radius: var(--radius); display: block; }
+    </style>
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- 统计条 -->
+        <div class="file-stats">
+            <div class="file-stat"><div class="fs-value" id="stCities" style="color:var(--primary);">0</div><div class="fs-label">点亮城市</div></div>
+            <div class="file-stat"><div class="fs-value" id="stProvs" style="color:var(--primary);">0</div><div class="fs-label">覆盖省份</div></div>
+            <div class="file-stat"><div class="fs-value" id="stPoints">0</div><div class="fs-label">打卡点</div></div>
+            <div class="file-stat"><div class="fs-value" id="stDist">0</div><div class="fs-label">累计里程</div></div>
+            <div class="file-stat"><div class="fs-value" id="stDays">0</div><div class="fs-label">记录天数</div></div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="card" style="margin-bottom:16px;">
+            <div class="toolbar-row" style="justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;">
+                    轨迹只存在你自己的电脑里，绝不上传。每次打卡会自动识别所在城市，累计点亮；也可以手动补记去过的地方。
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="openManual()">+ 点亮城市</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openAnnual()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg> 年度报告</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openFpCardModal()" title="把填色足迹地图生成为分享图 / 手机壁纸">足迹名片</button>
+                    <button class="btn btn-secondary btn-sm" onclick="reparse()" title="按打卡地址重新识别省市">重新识别城市</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openIoModal()" title="导出 CSV/GPX · 导入 CSV/GPX · 照片定位导入"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 导入 / 导出</button>
+                    <a class="btn btn-secondary btn-sm" href="/location">去记一笔 →</a>
+                </div>
+            </div>
+            <div id="fpBackupLine" style="display:none;font-size:12px;color:var(--text-secondary);margin-top:8px;"></div>
+        </div>
+
+        <!-- 主体 -->
+        <div class="fp-grid">
+            <div>
+                <div class="fp-pane">
+                    <div class="fp-head">
+                        <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6v16l6-2 6 2 6-2 4 2V6l-4-2-6 2-6-2-6 2z"/><path d="M8 6v.01"/><path d="M16 6v.01"/><path d="M8 16v.01"/><path d="M16 16v.01"/></svg> 足迹地图</span>
+                        <span class="cnt" id="mapCount">—</span>
+                    </div>
+                    <!-- G1 视图切换：填色图（本地 SVG，无需 Key）⇄ 光点图（腾讯 GL 底图） -->
+                    <div class="fp-ctl-row" id="viewCtl" style="margin-top:0;">
+                        <span class="fp-ctl-label">视图</span>
+                        <button class="fp-chip active" data-view="choro" onclick="setMapView('choro')">填色图</button>
+                        <button class="fp-chip" data-view="light" onclick="setMapView('light')">光点图</button>
+                    </div>
+                    <div class="fp-map">
+                        <div id="cnMapWrap">
+                            <svg id="cnMap" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="中国省份填色足迹图"></svg>
+                            <div id="cnInset" title="南海诸岛">
+                                <svg id="cnInsetMap" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+                                <span class="cn-inset-cap">南海诸岛</span>
+                            </div>
+                            <div id="cnTip"></div>
+                        </div>
+                        <div id="tmap"></div>
+                        <div class="fp-map-empty" id="mapEmpty" style="display:none;">
+                            <div class="big"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6v16l6-2 6 2 6-2 4 2V6l-4-2-6 2-6-2-6 2z"/><path d="M8 6v.01"/><path d="M16 6v.01"/><path d="M8 16v.01"/><path d="M16 16v.01"/></svg></div>
+                            <div class="t">还没有足迹</div>
+                            <div class="d">记录第一个打卡点，或手动点亮一座城市，这里会铺开你的足迹地图。</div>
+                        </div>
+                    </div>
+                    <!-- G3 年份切片：纯前端过滤，切回「全部」即全量填色 -->
+                    <div class="fp-ctl-row" id="cnYearRow" style="display:none;"></div>
+                    <div class="fp-hint" id="mapHint"></div>
+                    <div id="lightTools" style="display:none;">
+                    <!-- 图层切换器：城市聚合 / 打卡点明细 / 两层同显（默认保持老行为：城市聚合） -->
+                    <div class="fp-ctl-row" id="layerCtl" style="display:none;">
+                        <span class="fp-ctl-label">图层</span>
+                        <button class="fp-chip active" data-layer="city" onclick="setLayerMode('city')">城市聚合</button>
+                        <button class="fp-chip" data-layer="point" onclick="setLayerMode('point')">打卡点明细</button>
+                        <button class="fp-chip" data-layer="both" onclick="setLayerMode('both')">两层同显</button>
+                    </div>
+                    <!-- 底图切换器：走腾讯 GL 原生 setBaseMap（矢量/卫星/路况 + features 精细控制）；选择结果与设置页共用 mapTileCfg -->
+                    <div class="fp-ctl-row" id="baseCtl" style="display:none;">
+                        <span class="fp-ctl-label">底图</span>
+                        <button class="fp-chip active" data-base="road" onclick="setBaseMapMode('road')">道路</button>
+                        <button class="fp-chip" data-base="minimal" onclick="setBaseMapMode('minimal')" title="仅道路+箭头，去 POI/文字/建筑，足迹光点最突出">极简</button>
+                        <button class="fp-chip" data-base="satellite" onclick="setBaseMapMode('satellite')">卫星</button>
+                        <button class="fp-chip" data-base="satroad" onclick="setBaseMapMode('satroad')" title="卫星影像叠加路网线，野外打卡定位更清楚">卫星+路网</button>
+                        <button class="fp-chip" data-base="traffic" onclick="setBaseMapMode('traffic')">路况</button>
+                    </div>
+                    <!-- 照片数据（v47）：显示开关 + 颜色选择；独立于轨迹图层，默认黄色 -->
+                    <div class="fp-ctl-row" id="photoCtl" style="display:none;">
+                        <span class="fp-ctl-label">照片数据</span>
+                        <button class="fp-chip" id="photoToggle" onclick="setPhotoVisible()">显示照片数据</button>
+                        <span class="fp-dot-row" id="photoColors"></span>
+                    </div>
+                    <!-- 时间轴回放控制条（四·补）：地图就绪且 ≥2 个打卡点时才显示 -->
+                    <div id="tlBar" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--border-color);border-radius:8px;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <button class="btn btn-primary btn-sm" id="tlPlayBtn" onclick="tlToggle()" style="min-width:52px;">▶</button>
+                            <input type="range" id="tlRange" min="0" max="1000" value="0" style="flex:1;min-width:140px;" oninput="tlSeek(this.value)">
+                            <select id="tlSpeed" style="width:auto;" onchange="tlSetSpeed(this.value)" title="回放速度">
+                                <option value="1">1×</option>
+                                <option value="4">4×</option>
+                                <option value="16">16×</option>
+                            </select>
+                            <button class="btn btn-secondary btn-sm" onclick="tlReset()">重置</button>
+                        </div>
+                        <div id="tlStatus" style="font-size:12px;color:var(--text-secondary);margin-top:6px;"></div>
+                    </div>
+                    </div><!-- /lightTools -->
+                </div>
+
+                <div class="fp-pane">
+                    <div class="fp-head">
+                        <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> 省份覆盖</span>
+                        <span class="cnt" id="provCount">0 / 34</span>
+                    </div>
+                    <div class="prov-bar"><i id="provBar" style="width:0%"></i></div>
+                    <div class="prov-grid" id="provGrid"></div>
+                </div>
+            </div>
+
+            <div class="fp-pane">
+                <div class="fp-head">
+                    <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> 点亮的城市</span>
+                    <span class="cnt" id="cityCount">0 座</span>
+                </div>
+                <div class="fp-city-list" id="cityList"></div>
+            </div>
+        </div>
+
+        <!-- ===== 任务 #16 高德对标：城市卡片网格 / 高光日历 / 地点时间线（纯前端聚合，全部融入本页） ===== -->
+        <div class="fp-pane" id="cardPane">
+            <div class="fp-head">
+                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> 城市卡片</span>
+                <span class="cnt" id="cardCount">0 座</span>
+            </div>
+            <div class="fp-cards" id="cityCards"></div>
+        </div>
+
+        <div class="fp-pane" id="calPane">
+            <div class="fp-head">
+                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> 高光日历</span>
+                <span class="cnt" id="calCount">—</span>
+            </div>
+            <div class="fc-wrap">
+                <div class="fc-cal">
+                    <div class="fc-top">
+                        <div class="fc-title" id="calTitle">—</div>
+                        <div class="fc-nav">
+                            <button type="button" id="calPrev" onclick="calShift(-1)" title="上个月">‹</button>
+                            <button type="button" id="calToday" onclick="calGoToday()" title="回到本月">今</button>
+                            <button type="button" id="calNext" onclick="calShift(1)" title="下个月">›</button>
+                        </div>
+                    </div>
+                    <div class="fc-grid7" id="calDow"></div>
+                    <div class="fc-grid7" id="calGrid" style="margin-top:2px;"></div>
+                    <div class="fc-daylist" id="calDayList"></div>
+                </div>
+                <div class="fc-moodbar">
+                    <div class="lb"><span>今日心情文案</span><span id="calMoodHint" style="font-weight:400;">编辑后自动保存</span></div>
+                    <input class="txt" id="calMoodText" maxlength="60" placeholder="写一句属于你的足迹心情…" oninput="calMoodSave()">
+                </div>
+            </div>
+        </div>
+
+        <div class="fp-pane" id="placePane">
+            <div class="fp-head">
+                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 地点时间线</span>
+                <span class="cnt" id="placeCount">0 个地点</span>
+            </div>
+            <div class="fp-place-list" id="placeList"></div>
+        </div>
+
+        <!-- 成就墙 -->
+        <div class="fp-pane">
+            <div class="fp-head">
+                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.21 15 11 17.24"/><path d="M17.13 4.87 16 2.5 13.5 4.5 12 2l-1.5 2.5L8 2.5 6.87 4.87"/><circle cx="12" cy="15" r="6"/><circle cx="12" cy="15" r="2"/></svg> 足迹成就</span>
+                <span class="cnt" id="achCount">0 / 0</span>
+            </div>
+            <div class="ach-grid" id="achGrid"></div>
+        </div>
+    </div>
+
+    <!-- 手动点亮城市 -->
+    <div id="manualModal" class="modal-overlay">
+        <div class="modal" style="width:460px;max-width:94vw;">
+            <div class="modal-header">
+                <h3>点亮城市</h3>
+                <button class="modal-close" onclick="closeModal('manualModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>搜索城市</label>
+                <input type="text" id="mCityKw" placeholder="输入城市名，如 成都 / 杭州" autocomplete="off" oninput="debouncedCitySearch()">
+            </div>
+            <div class="city-sug" id="citySug"></div>
+            <div class="form-group" style="margin-top:12px;">
+                <label>首次到达日期（可选）</label>
+                <input type="date" id="mFirstDate">
+            </div>
+            <div class="form-group">
+                <label>备注（可选）</label>
+                <input type="text" id="mRemark" placeholder="如：大学四年 / 出差路过">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('manualModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveManual()">点亮</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 年度报告 -->
+    <div id="annualModal" class="modal-overlay">
+        <div class="modal" style="width:720px;max-width:94vw;">
+            <div class="modal-header">
+                <h3>年度足迹报告</h3>
+                <button class="modal-close" onclick="closeModal('annualModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="annualBody" style="max-height:76vh;overflow-y:auto;"></div>
+            <div class="modal-footer">
+                <select id="anYear" style="width:auto;margin-right:auto;" onchange="openAnnual(this.value)"></select>
+                <button class="btn btn-secondary" onclick="renderAnnualCard(window.__annual, 'card')">保存分享图</button>
+                <button class="btn btn-secondary" onclick="renderAnnualCard(window.__annual, 'wallpaper')">保存壁纸</button>
+                <button class="btn btn-primary" onclick="closeModal('annualModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 照片查看 -->
+    <div id="photoModal" class="modal-overlay" onclick="closeModal('photoModal')">
+        <div class="modal photo-viewer" style="width:auto;max-width:92vw;background:transparent;box-shadow:none;" onclick="event.stopPropagation()">
+            <img id="photoImg" src="" alt="照片">
+        </div>
+    </div>
+
+    <!-- G2 足迹名片：填色图 → 分享图 / 壁纸（canvas 本机生成） -->
+    <div id="fpCardModal" class="modal-overlay">
+        <div class="modal" style="width:460px;max-width:94vw;">
+            <div class="modal-header">
+                <h3>足迹名片</h3>
+                <button class="modal-close" onclick="closeModal('fpCardModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
+                把「填色图」生成为图片：含省份填色地图与足迹统计。跟随当前所选年份视角（如先选 2024 年再保存，即得 2024 年名片）。
+                图片仅在本机生成，不会上传。
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="renderFootprintCard('card')">保存分享图</button>
+                <button class="btn btn-secondary" onclick="renderFootprintCard('wallpaper')">保存壁纸（1080×2340）</button>
+                <button class="btn btn-primary" onclick="closeModal('fpCardModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- G4 省份下钻：点击填色图省份，查看该省点亮城市清单（跟随当前年份视角） -->
+    <div id="provModal" class="modal-overlay" onclick="closeModal('provModal')">
+        <div class="modal" style="width:560px;max-width:94vw;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="provModalTitle">省份足迹</h3>
+                <button class="modal-close" onclick="closeModal('provModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="provModalBody" style="max-height:70vh;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- 导入 / 导出（含照片定位导入）：解析在前端，服务端只收归一化点数组 -->
+    <div id="ioModal" class="modal-overlay">
+        <div class="modal" style="width:660px;max-width:94vw;">
+            <div class="modal-header">
+                <h3>导入 / 导出足迹</h3>
+                <button class="modal-close" onclick="closeModal('ioModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height:76vh;overflow-y:auto;">
+                <div class="form-group">
+                    <label>导出</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <a class="btn btn-secondary btn-sm" id="ioExportCsv" href="/api/footprint/export?format=csv" download>⬇ 导出 CSV（Excel 可开）</a>
+                        <a class="btn btn-secondary btn-sm" id="ioExportGpx" href="/api/footprint/export?format=gpx" download>⬇ 导出 GPX</a>
+                    </div>
+                    <small style="display:block;color:var(--text-secondary);font-size:11.5px;margin-top:6px;line-height:1.7;">
+                        CSV 为 UTF-8（带 BOM，Excel 直开不乱码），时间戳为 Unix 秒，列与一生足迹习惯对齐；GPX 为标准 1.1 格式（ISO8601 时间），可导入其它轨迹工具。
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label>导入 CSV / GPX</label>
+                    <input type="file" id="ioFile" accept=".csv,.gpx,text/csv,application/gpx+xml" onchange="ioFilePick(this)" style="font-size:12.5px;max-width:100%;">
+                    <textarea id="ioPaste" placeholder="或直接粘贴 CSV / GPX 文本…" style="width:100%;min-height:72px;margin-top:8px;font-size:12px;font-family:monospace;"></textarea>
+                    <button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="ioPasteParse()">解析粘贴内容</button>
+                    <small style="display:block;color:var(--text-secondary);font-size:11.5px;margin-top:4px;line-height:1.7;">
+                        支持列名（中英皆可）：时间戳/time、纬度/lat、经度/lng、地点/名称/name、地址/address、省/province、市/city、区/district、心情/mood、天气/weather、备注/remark；Unix 秒与 ISO 时间都认。GPX 解析 trkpt/rtept/wpt。
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label>照片数据管理</label>
+                    <div id="photoStat" style="font-size:12.5px;color:var(--text-secondary);margin-bottom:8px;">已记录 0 条照片点位</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                        <label class="btn btn-secondary btn-sm" style="margin:0;cursor:pointer;">导入照片
+                            <input type="file" id="ioPhoto" accept="image/*" multiple onchange="ioPhotoPick(this)" style="display:none;">
+                        </label>
+                        <label class="btn btn-secondary btn-sm" style="margin:0;cursor:pointer;">文件选照片
+                            <input type="file" id="ioPhotoRaw" multiple onchange="ioPhotoPick(this)" style="display:none;">
+                        </label>
+                        <label class="btn btn-secondary btn-sm" style="margin:0;cursor:pointer;">导入 JSON
+                            <input type="file" id="ioPhotoFile" accept=".json,application/json" onchange="ioPhotoFilePick(this)" style="display:none;">
+                        </label>
+                        <a class="btn btn-secondary btn-sm" id="ioPhotoExport" href="/api/photo-points/export" download>⬇ 导出照片数据</a>
+                        <button class="btn btn-secondary btn-sm" onclick="ioPhotoClear()">清空</button>
+                    </div>
+                    <small style="display:block;color:var(--text-secondary);font-size:11.5px;margin-top:6px;line-height:1.7;">
+                        在本机读取照片 EXIF 中的 GPS 坐标生成照片点位（点位名取文件名，96px 缩略图随点位保存）。<b>照片数据区别于轨迹数据：不生成轨迹、是单独一层、不随时间切换，默认黄色</b>，显示/隐藏与颜色在地图下方「照片数据」一行配置。无定位或非 JPEG 的照片自动跳过并计数，照片文件本身不会上传。<br>
+                        <b>读不到定位？</b>① <b>安卓请用「文件选照片」</b>：从 内部存储/DCIM/Camera 直选原图——相册缩略图选择器会按系统隐私策略剥掉定位（选择器底部会提示「不含位置信息」），文件入口才能拿到完整原图；② iPhone 用「导入照片」，选图页点「选项」开「所有照片数据」；③ 微信/QQ 转发、截图会丢定位，请用原图；④ 相机需开启「保存地理位置/记录位置」；⑤ HEIC 格式暂不支持（iPhone 改「兼容性最佳」后为 JPEG）。
+                    </small>
+                </div>
+                <div id="ioPreview" style="display:none;border:1px solid var(--border-color);border-radius:8px;padding:10px 12px;margin-top:4px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('ioModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script src="/js/footprint.js?v=1.48.54"></script>
+</body>
+</html>

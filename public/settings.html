@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设置 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <style>
+        .set-group { margin-bottom: 22px; }
+        .set-group-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0 0 10px 2px; }
+        .set-card { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+        /* P2-5c：设置页 sticky 锚点目录（板块锚点），窄屏可横向滑动 */
+        html { scroll-behavior: smooth; scroll-padding-top: 56px; }
+        .set-anchor {
+            position: sticky; top: 0; z-index: 5; display: flex; gap: 8px;
+            overflow-x: auto; white-space: nowrap; padding: 8px 2px; margin-bottom: 12px;
+            background: var(--bg-primary); border-bottom: 1px solid var(--border-color);
+            -webkit-overflow-scrolling: touch;
+        }
+        .set-anchor::-webkit-scrollbar { height: 0; }
+        .set-anchor a {
+            font-size: 12px; color: var(--text-secondary); text-decoration: none;
+            padding: 6px 12px; border-radius: 999px; background: var(--card-bg); flex: 0 0 auto;
+            border: 1px solid var(--border-color);
+            /* UI-51：触控热区补到 44px */
+            display: inline-flex; align-items: center; min-height: 44px;
+        }
+        .set-anchor a:active { background: var(--primary-light); }
+        /* P1-4：锚点选中态强化——当前区块的目录项主色底+白字，滚动跟随 */
+        .set-anchor a:hover { border-color: var(--primary); color: var(--primary); }
+        .set-anchor a.active { background: var(--primary); border-color: var(--primary); color: var(--text-on-primary); font-weight: 600; }
+        .set-row {
+            display: flex; align-items: center; gap: 14px;
+            padding: 16px 20px; border-bottom: 1px solid var(--border-color);
+            cursor: pointer; transition: background .15s;
+        }
+        .set-row:last-child { border-bottom: none; }
+        .set-row:hover { background: var(--primary-light); }
+        .set-row.no-hover { cursor: default; }
+        .set-row.no-hover:hover { background: transparent; }
+        .set-icon {
+            width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 17px; color: #fff;
+        }
+        .set-main { flex: 1; min-width: 0; }
+        .set-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+        .set-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .set-arrow { color: var(--text-secondary); font-size: 16px; opacity: .6; }
+        /* 外观弹窗：三选/两选分段控件（跟随系统 / 浅色 / 深色；标准 / 大字） */
+        .theme-mode-seg { display: flex; gap: 6px; background: var(--bg-inset); border-radius: 10px; padding: 4px; }
+        .theme-mode-seg .seg-btn { flex: 1; border: 0; background: transparent; border-radius: 8px; padding: 9px 6px; min-height: 40px; font-size: 13px; font-family: inherit; color: var(--text-secondary); cursor: pointer; }
+        .theme-mode-seg .seg-btn.active { background: var(--card-bg); color: var(--primary); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+        .ic-blue { background: #3b82f6; } .ic-green { background: #22c55e; } .ic-red { background: #ef4444; }
+        .ic-purple { background: #a855f7; } .ic-orange { background: #f97316; } .ic-teal { background: #14b8a6; }
+        /* amber 取 600 档而非其余色用的 500 档：#f59e0b 配白图标只有 2.23，
+           图标本身就是唯一信息载体（36px 方块里没有文字），压到 3.25 更稳。 */
+        .ic-amber { background: #d97706; }
+        .ic-pink { background: #ec4899; } .ic-dark { background: #475569; } .ic-cyan { background: #06b6d4; }
+    </style>
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- A4：移动端「全部功能」入口——5 Tab 底栏不再放「更多」按钮，改由「我的」页顶部承接原更多面板；仅窄屏显示 -->
+        <button type="button" class="settings-allfn" onclick="openMoreSheet()" aria-label="全部功能">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+            <span>全部功能</span>
+        </button>
+        <!-- P2-5c：板块锚点目录（sticky，窄屏横向滑动） -->
+        <div class="set-anchor" id="setAnchor">
+            <a href="#gAccount">账户设置</a><a href="#gRemind">提醒感知</a>
+            <a href="#gPush">消息推送</a><a href="#gSecurity">安全</a>
+            <a href="#gTheme">外观与主题</a><a href="#gTrack">位置轨迹</a>
+            <a href="#gBackup">数据备份</a><a href="#gSystem">系统管理</a>
+        </div>
+        <script>
+            (function anchorAlias() {
+                document.addEventListener('click', function (e) {
+                    const a = e.target && e.target.closest ? e.target.closest('.set-anchor a') : null;
+                    if (!a) return;
+                    const id = (a.getAttribute('href') || '').slice(1);
+                    if (!id || document.getElementById(id)) return;      // 有同 id 元素则用原生锚点
+                    const target = document.querySelector('.set-group[data-anchor="' + id + '"]');
+                    if (!target) return;
+                    e.preventDefault();
+                    try { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (err) { target.scrollIntoView(); }
+                });
+            })();
+            /* P-anchor：目录选中态跟随滚动（节流 + 求顶栏下方第一个块），点击立即置顶。
+               注意：本脚本位于板块 DOM 之前，需等 DOMContentLoaded 再绑定 */
+            (function anchorActive() {
+                function boot() {
+                    const links = Array.prototype.slice.call(document.querySelectorAll('.set-anchor a'));
+                    const groups = Array.prototype.slice.call(document.querySelectorAll('.set-group'));
+                    if (!links.length || !groups.length) return;
+                    const anchorOf = g => g.getAttribute('data-anchor') || g.id;
+                    function setActive(id) {
+                        links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + id); });
+                    }
+                    document.addEventListener('click', function (e) {
+                        const a = e.target && e.target.closest ? e.target.closest('.set-anchor a') : null;
+                        if (a) setActive((a.getAttribute('href') || '').slice(1));
+                    });
+                    let ticking = false;
+                    function update() {
+                        ticking = false;
+                        let cur = anchorOf(groups[0]);
+                        for (const g of groups) {
+                            const r = g.getBoundingClientRect();
+                            if (r.top <= 130 && r.bottom > 130) { cur = anchorOf(g); break; }
+                        }
+                        setActive(cur);
+                    }
+                    window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+                    update();
+                }
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+                else boot();
+            })();
+        </script>
+        <!-- 账户设置 -->
+        <div class="set-group" id="gAccount">
+            <div class="set-group-title">账户设置</div>
+            <div class="set-card">
+                <div class="set-row" onclick="showProfileModal()">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                    <div class="set-main"><div class="set-title" id="profileName">个人信息</div><div class="set-desc" id="profileDesc">--</div></div>
+                    <div class="user-avatar" id="profileAvatar" style="width:30px;height:30px;font-size:13px;">A</div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="showRenameModal()">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+                    <div class="set-main"><div class="set-title">修改用户名</div><div class="set-desc">更改登录账号名称</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="showPwdModal()">
+                    <span class="set-icon ic-red"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg></span>
+                    <div class="set-main"><div class="set-title">修改密码</div><div class="set-desc">更改登录密码</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <!-- v71：多空间未落地前隐藏「默认进入空间」（弹窗仅 1 个选项，无实际选择能力） -->
+                <div class="set-row" onclick="showSpaceModal()" style="display:none;">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+                    <div class="set-main"><div class="set-title">默认进入空间</div><div class="set-desc" id="spaceDesc">设置登录后默认进入的空间</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 提醒感知 -->
+        <div class="set-group" id="gRemind">
+            <div class="set-group-title">提醒感知</div>
+            <div class="set-card">
+                <div class="set-row" onclick="showRemindModal()">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                    <div class="set-main"><div class="set-title">事务提醒检测</div><div class="set-desc" id="remindDesc">每5分钟检测一次提醒</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg></span>
+                    <div class="set-main"><div class="set-title">人情记账通知</div><div class="set-desc">回礼提醒、月度对账推送</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swNotifyGift" onchange="saveFlag('notifyGift',this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-cyan"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg></span>
+                    <div class="set-main"><div class="set-title">证件效期通知</div><div class="set-desc">到期物品当日提前提醒</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swNotifyExpiry" onchange="saveFlag('notifyExpiry',this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>
+                    <div class="set-main"><div class="set-title">贷款计算通知</div><div class="set-desc">还款日前推送提醒，避免逾期</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swNotifyLoan" onchange="saveFlag('notifyLoan',this.checked)"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息推送 -->
+        <div class="set-group" id="pushGroup" data-anchor="gPush">
+            <div class="set-group-title">消息推送（每日晨报 · 单个机器人）</div>
+            <div class="set-card">
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
+                    <div class="set-main"><div class="set-title">开启消息推送</div><div class="set-desc" id="pushDesc">未配置机器人，先点下方填写 Webhook</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swPushEnabled" onchange="savePushCfg({enabled:this.checked},this)"><span class="slider"></span></label>
+                </div>
+                <div class="set-row" onclick="showPushModal()">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+                    <div class="set-main"><div class="set-title">机器人 Webhook</div><div class="set-desc" id="pushHookDesc">未配置</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-cyan"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                    <div class="set-main"><div class="set-title">每日推送时间</div><div class="set-desc">每天定时一条今日摘要：今天要处理 + 到期预警</div></div>
+                    <input type="time" id="inpPushTime" style="width:120px;" onchange="savePushCfg({dailyTime:this.value},this)">
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg></span>
+                    <div class="set-main"><div class="set-title">到期提前提醒</div><div class="set-desc">档案 / 保单 / 纪念日提前几天一起推</div></div>
+                    <select id="selPushLead" style="width:100px;" onchange="savePushCfg({leadDays:+this.value},this)">
+                        <option value="0">关闭</option>
+                        <option value="1">1 天</option>
+                        <option value="3">3 天</option>
+                        <option value="7">7 天</option>
+                        <option value="15">15 天</option>
+                        <option value="30">30 天</option>
+                    </select>
+                </div>
+                <div class="set-row" onclick="testPush(this)">
+                    <span class="set-icon ic-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></span>
+                    <div class="set-main"><div class="set-title">发送测试消息</div><div class="set-desc" id="pushLastDesc">保存配置后点这里验证能否收到</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="location.href='/general-config#channels'">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+                    <div class="set-main"><div class="set-title">事务提醒的多通道与模板</div><div class="set-desc">企业微信 / 钉钉 / 飞书等外部通道与消息模板 → 去通用配置</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 安全 -->
+        <div class="set-group" id="gSecurity">
+            <div class="set-group-title">安全</div>
+            <div class="set-card">
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-red"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                    <div class="set-main"><div class="set-title">强制修改初始密码</div><div class="set-desc">账号仍是出厂密码时，登录后必须先改密才能使用</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swRequirePwdChange" onchange="savePushCfg({requirePwdChange:this.checked},this)"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 外观与主题 -->
+        <div class="set-group" id="gTheme">
+            <div class="set-group-title">外观与主题</div>
+            <div class="set-card">
+                <div class="set-row" onclick="showThemeModal()">
+                    <span class="set-icon ic-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>
+                    <div class="set-main"><div class="set-title">主题模式</div><div class="set-desc">深/浅主题切换、主题色选择</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M9 13v2"/><path d="M15 13v2"/></svg></span>
+                    <div class="set-main"><div class="set-title">AI 悬浮图标</div><div class="set-desc">未勾选时隐藏右侧 AI 悬浮入口</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swShowAiFloat" onchange="saveFlag('showAiFloat',this.checked)"><span class="slider"></span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 位置轨迹 -->
+        <div class="set-group" id="gTrack">
+            <div class="set-group-title">位置轨迹</div>
+            <div class="set-card">
+                <div class="set-row" onclick="showMapKeyModal()">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg></span>
+                    <div class="set-main"><div class="set-title">地图 Key（腾讯位置服务）</div><div class="set-desc" id="mapKeyDesc">未配置 —— 配置后启用地点搜索 / 逆地理定位；轨迹底图为高德瓦片，无需 Key</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row no-hover" style="cursor:default;">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
+                    <div class="set-main"><div class="set-title">自动记录间隔</div><div class="set-desc">自动定位时每隔多久采一个点（记录期间需保持轨迹页打开）</div></div>
+                    <select id="selTrackInterval" onchange="saveTrackInterval(this.value)" style="width:auto;flex:none;">
+                        <option value="1">1 分钟</option>
+                        <option value="2">2 分钟</option>
+                        <option value="5">5 分钟</option>
+                        <option value="10">10 分钟</option>
+                        <option value="15">15 分钟</option>
+                        <option value="30">30 分钟</option>
+                        <option value="60">60 分钟</option>
+                    </select>
+                </div>
+                <div class="set-row no-hover" style="cursor:default;">
+                    <span class="set-icon ic-amber"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+                    <div class="set-main"><div class="set-title">城市点亮规则</div><div class="set-desc">按打卡点停留时长点亮，防路过/途经误点亮；手动点亮不受影响。收紧后部分已点亮城市与相关成就会暂时回落，调回即自动恢复</div></div>
+                    <select id="selFpRule" onchange="saveFpRule(this.value)" style="width:auto;flex:none;">
+                        <option value="0">打卡即点亮</option>
+                        <option value="15">停留 15 分钟</option>
+                        <option value="30">停留 30 分钟</option>
+                        <option value="60">停留 1 小时</option>
+                        <option value="120">停留 2 小时</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据备份（完整还原点） -->
+        <div class="set-group" id="backupGroup" data-anchor="gBackup">
+            <div class="set-group-title">数据备份（防止数据丢失）</div>
+            <div class="set-card">
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
+                    <div class="set-main"><div class="set-title">每天自动备份</div><div class="set-desc" id="backupEnabledDesc">正在读取…</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swBackupEnabled" onchange="saveBackupCfg({enabled:this.checked})"><span class="slider"></span></label>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                    <div class="set-main">
+                        <div class="set-title">异地备份目录</div>
+                        <div class="set-desc" id="backupRemoteDesc">未配置 —— 当前备份和数据在同一块盘上，这块盘坏了两个一起没</div>
+                        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                            <input type="text" id="inpBackupRemote" placeholder="例如 D:\备份 或 /mnt/usb/backup（填绝对路径）" style="flex:1;min-width:0;">
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="saveBackupRemote()">保存</button>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" type="button" style="margin-top:8px;" onclick="detectBackupVolumes()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> 检测可用位置</button>
+                        <div id="backupVolBox" style="display:none;margin-top:8px;"></div>
+                    </div>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                    <div class="set-main"><div class="set-title">备份情况</div><div class="set-desc" id="backupStatDesc">正在读取…</div></div>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg></span>
+                    <div class="set-main"><div class="set-title">保留策略</div><div class="set-desc" id="backupRetentionDesc">最近 7 天每天留 1 份；更早的每周留 1 份、每月留 1 份，旧备份自动清理</div></div>
+                </div>
+                <div class="set-row" onclick="runBackupNow(this)">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></svg></span>
+                    <div class="set-main"><div class="set-title">立即备份</div><div class="set-desc" id="backupRunDesc">马上生成一份完整还原点（数据库 + 密钥 + 附件）</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="verifyLatestBackup(this)">
+                    <span class="set-icon ic-cyan"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                    <div class="set-main"><div class="set-title">校验最新备份</div><div class="set-desc">重新计算校验和，确认备份没有损坏</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统管理（含「模块启停与数据开关」跳转入口） -->
+        <div class="set-group" id="gSystem" style="margin-bottom:0;">
+            <div class="set-group-title">系统管理</div>
+            <div class="set-card">
+                <div class="set-row" onclick="location.href='/admin-modules'">
+                    <span class="set-icon ic-pink"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073-.05-.336.062-.676.303-.917l1.525-1.525A2.402 2.402 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02z"/></svg></span>
+                    <div class="set-main"><div class="set-title">模块启停与数据开关</div><div class="set-desc">模块开关 = 导航入口显隐；数据开关 = 隐藏数据 / 停推送 → 去模块管理</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg></span>
+                    <div class="set-main"><div class="set-title">使用统计</div><div class="set-desc">统计「使用次数 + 访问平台」供使用洞察页分析，不采集任何记录内容</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swTelemetry" onchange="saveFlag('telemetry',this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="set-row no-hover">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                    <div class="set-main"><div class="set-title">用户注册</div><div class="set-desc">允许新用户在此版本注册新账号</div></div>
+                    <label class="switch" onclick="event.stopPropagation()"><input type="checkbox" id="swAllowReg" onchange="saveFlag('allowRegistration',this.checked)"><span class="slider"></span></label>
+                </div>
+                <div class="set-row" onclick="location.href='/general-config#users'">
+                    <span class="set-icon ic-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                    <div class="set-main"><div class="set-title">用户管理</div><div class="set-desc">管理系统用户账号</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="location.href='/general-config#channels'">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+                    <div class="set-main"><div class="set-title">通知通道与消息模板</div><div class="set-desc">企业微信/钉钉/飞书推送配置</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="showWechatModal()">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg></span>
+                    <div class="set-main"><div class="set-title">微信订阅消息配置</div><div class="set-desc">小程序订阅消息推送（AppSecret / 模板 ID / 字段映射）</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="showDataModal()">
+                    <span class="set-icon ic-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                    <div class="set-main"><div class="set-title">数据管理</div><div class="set-desc">数据导出与导入（导入将覆盖现有数据，请先备份）</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+                <div class="set-row" onclick="showStorageModal()">
+                    <span class="set-icon ic-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>
+                    <div class="set-main"><div class="set-title">对象存储 API</div><div class="set-desc">自建自动云备份名称（兼容 MinIO/S3）</div></div>
+                    <span class="set-arrow">›</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 个人信息弹窗 -->
+    <div id="profileModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>个人信息</h3><button class="modal-close" onclick="closeModal('profileModal')">&times;</button></div>
+            <div style="text-align:center;padding:10px 0 6px;">
+                <div class="user-avatar" style="width:64px;height:64px;font-size:26px;margin:0 auto 10px;" id="modalAvatar">A</div>
+                <div style="font-size:16px;font-weight:600;" id="modalName">--</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;" id="modalRole">--</div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('profileModal')">关闭</button></div>
+        </div>
+    </div>
+
+    <!-- 消息推送配置弹窗 -->
+    <div id="pushModal" class="modal-overlay">
+        <div class="modal" style="width:520px;">
+            <div class="modal-header"><h3>消息推送配置</h3><button class="modal-close" onclick="closeModal('pushModal')">&times;</button></div>
+            <div style="background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px;line-height:1.7;">
+                <b>怎么拿到 Webhook？</b><br>
+                <span style="color:var(--text-secondary);">
+                企业微信：手机建个群（拉个小号即可）→ 群设置 → 群机器人 → 添加 → 复制 Webhook 地址<br>
+                Bark（iPhone 最快）：App Store 装 Bark → 打开复制 URL → 选 Bark 通道粘贴<br>
+                Server酱：微信扫码登录 sct.ftqq.com → 复制 SendKey
+                </span>
+            </div>
+            <div class="form-group"><label>推送通道 *</label>
+                <select id="selPushChannel" onchange="onPushChannelChange()"></select>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;" id="pushChannelHint"></div>
+            </div>
+            <div class="form-group"><label>机器人 Webhook *</label>
+                <input type="text" id="inpPushHook" placeholder="粘贴上一步复制的地址">
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;">已有配置时留空表示不修改</div>
+            </div>
+            <div class="form-group"><label>每日推送时间</label>
+                <input type="time" id="inpPushTimeM" value="08:00">
+            </div>
+            <div class="form-group"><label>打开地址（可选）</label>
+                <input type="text" id="inpPushBase" placeholder="http://192.168.31.131:15808">
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;">推送文案末尾会附上这个地址，点开直达驾驶舱</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pushModal')">取消</button>
+                <button class="btn btn-secondary" onclick="testPush()">发测试消息</button>
+                <button class="btn btn-primary" onclick="savePushWebhook()">保存并开启</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 微信订阅消息配置弹窗 -->
+    <div id="wechatModal" class="modal-overlay">
+        <div class="modal" style="width:560px;max-width:94vw;">
+            <div class="modal-header"><h3>微信订阅消息配置</h3><button class="modal-close" onclick="closeModal('wechatModal')">&times;</button></div>
+            <div class="form-group"><label>AppId</label><input type="text" id="inpWxAppId" placeholder="wx..."></div>
+            <div class="form-group"><label>AppSecret</label><input type="password" id="inpWxSecret" placeholder="留空表示不修改">
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;" id="wxSecretHint"></div>
+            </div>
+            <div class="form-group"><label>模板 ID（TemplateId）</label><input type="text" id="inpWxTpl" placeholder="如：xxxxxx"></div>
+            <div class="form-group"><label>跳转页（点击消息打开的页面）</label><input type="text" id="inpWxPage" placeholder="pages/dashboard/dashboard"></div>
+            <div class="form-group">
+                <label>模板字段映射</label>
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">字段 key 按微信订阅消息模板填写（如 thing1、time2），值支持占位符：<code>{{date}}</code> 日期、<code>{{time}}</code> 时间、<code>{{datetime}}</code> 日期时间、<code>{{text}}</code> 提醒标题。</div>
+                <div id="wxTplFields"></div>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="addWxField()" style="margin-top:8px;">+ 添加字段</button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('wechatModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveWechatCfg()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改用户名弹窗 -->
+    <div id="renameModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>修改用户名</h3><button class="modal-close" onclick="closeModal('renameModal')">&times;</button></div>
+            <div class="form-group"><label>新用户名 *</label><input type="text" id="newUsername" placeholder="请输入新用户名"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('renameModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveRename()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改密码弹窗 -->
+    <div id="pwdModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>修改密码</h3><button class="modal-close" onclick="closeModal('pwdModal')">&times;</button></div>
+            <div class="form-group"><label>原密码 *</label><input type="password" id="oldPwd" placeholder="请输入原密码"></div>
+            <div class="form-group"><label>新密码 *</label><input type="password" id="newPwd" placeholder="至少6位"></div>
+            <div class="form-group"><label>确认新密码 *</label><input type="password" id="newPwd2" placeholder="再次输入新密码"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pwdModal')">取消</button>
+                <button class="btn btn-primary" onclick="savePwd()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 默认空间弹窗 -->
+    <div id="spaceModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>默认进入空间</h3><button class="modal-close" onclick="closeModal('spaceModal')">&times;</button></div>
+            <div class="form-group"><label>空间</label>
+                <select id="spaceSelect"><option>个人空间</option></select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('spaceModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveSpace()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提醒检测弹窗 -->
+    <div id="remindModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>事务提醒检测</h3><button class="modal-close" onclick="closeModal('remindModal')">&times;</button></div>
+            <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                <label class="switch" style="margin:0;"><input type="checkbox" id="remindOn"><span class="slider"></span></label>
+                <span style="font-size:14px;">开启提醒检测</span>
+            </div>
+            <div class="form-group"><label>提前提醒</label>
+                <select id="remindLead"><option value="1">提前 1 小时</option><option value="5">提前 5 小时</option><option value="24">提前 24 小时</option></select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('remindModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveRemind()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主题模式弹窗 -->
+    <div id="themeModal" class="modal-overlay">
+        <div class="modal" style="width:380px;">
+            <div class="modal-header"><h3>外观与阅读</h3><button class="modal-close" onclick="closeModal('themeModal')">&times;</button></div>
+            <div class="form-group">
+                <label>外观模式</label>
+                <div class="theme-mode-seg" id="themeModeSeg">
+                    <button type="button" class="seg-btn" data-mode="auto" onclick="pickThemeMode('auto')">跟随系统</button>
+                    <button type="button" class="seg-btn" data-mode="light" onclick="pickThemeMode('light')">浅色</button>
+                    <button type="button" class="seg-btn" data-mode="dark" onclick="pickThemeMode('dark')">深色</button>
+                </div>
+                <div class="field-hint">「跟随系统」会随 Windows / 手机系统自动切换深浅色</div>
+            </div>
+            <div class="form-group">
+                <label>字体大小</label>
+                <div class="theme-mode-seg" id="fontSizeSeg">
+                    <button type="button" class="seg-btn" data-mode="normal" onclick="pickFontSize('normal')">标准</button>
+                    <button type="button" class="seg-btn" data-mode="large" onclick="pickFontSize('large')">大字（关怀）</button>
+                </div>
+                <div class="field-hint">关怀模式加大正文与触控目标，方便长辈使用</div>
+            </div>
+            <div class="form-group">
+                <label>主题色</label>
+                <div class="theme-color-dots" id="themeDots" style="padding:6px 0;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('themeModal')">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 腾讯位置服务 Key 弹窗 -->
+    <div id="mapKeyModal" class="modal-overlay">
+        <div class="modal" style="width:580px;max-width:94vw;">
+            <div class="modal-header"><h3>地图 Key（腾讯位置服务）</h3><button class="modal-close" onclick="closeModal('mapKeyModal')">&times;</button></div>
+            <div class="form-group">
+                <label>Key</label>
+                <input type="text" id="inpMapKey" placeholder="粘贴你在腾讯位置服务申请的 Key" autocomplete="off">
+                <div class="field-hint">该 Key 仅用于地点搜索 / 逆地理定位；地图底图为高德瓦片（免费，无需 Key），留空也能正常显示。</div>
+            </div>
+            <div class="field-hint" style="line-height:1.9;">
+                <strong>申请步骤</strong><br>
+                ① 打开 <a href="https://lbs.qq.com/" target="_blank" rel="noopener">腾讯位置服务</a> 注册并登录<br>
+                ② 控制台 → 应用管理 → 我的应用 → 创建应用<br>
+                ③ 在该应用下「添加 Key」，勾选 <strong>WebServiceAPI</strong> 与 <strong>JavaScript API GL</strong><br>
+                ④ 在 Key 设置里把本站地址（localhost / 服务器 IP / 你的域名）加入 <strong>域名白名单</strong><br>
+                ⑤ 复制 Key 粘贴到上方并保存，之后在地图页即可搜索地点、按定位落点
+            </div>
+            <div class="field-hint" style="margin-top:10px;">
+                安全提示：JavaScript API 的 Key 必须写在页面里供浏览器调用，因此<strong>务必配置域名白名单</strong>，否则可能被他人盗用额度。系统本身不会内置任何 Key。
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mapKeyModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveMapKey()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据管理弹窗 -->
+    <div id="dataModal" class="modal-overlay">
+        <div class="modal" style="width:430px;">
+            <div class="modal-header"><h3>数据管理</h3><button class="modal-close" onclick="closeModal('dataModal')">&times;</button></div>
+            <div class="modal-body" style="padding:20px;">
+                <p style="font-size:13px;color:var(--text-secondary);margin:0 0 16px;line-height:1.8;">导出将下载包含全部业务数据的 JSON 备份文件（不含密码哈希）。导入会<b>覆盖当前数据</b>，导入前系统会自动生成本地时间戳备份兜底，请仍谨慎操作。</p>
+                <div style="display:flex;gap:10px;margin-bottom:14px;">
+                    <button class="btn btn-primary" style="flex:1;" onclick="exportData()">📤 导出 JSON 备份</button>
+                    <label class="btn btn-secondary" style="flex:1;text-align:center;cursor:pointer;margin:0;">
+                        📥 导入数据
+                        <input type="file" id="importFile" accept=".json,application/json" style="display:none;" onchange="doImport(this)">
+                    </label>
+                </div>
+                <div id="importStatus" style="font-size:12px;color:var(--text-secondary);line-height:1.7;display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 对象存储弹窗 -->
+    <div id="storageModal" class="modal-overlay">
+        <div class="modal" style="width:440px;">
+            <div class="modal-header"><h3>对象存储 API</h3><button class="modal-close" onclick="closeModal('storageModal')">&times;</button></div>
+            <div class="modal-body" style="padding:20px 20px 0;">
+                <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;margin-bottom:12px;">
+                    兼容 S3 / MinIO 协议。配置后可在下方<b>一键备份</b>：把全部业务数据（脱敏，不含密码哈希与密钥）加密上传到你的对象存储。
+                </div>
+                <div class="form-group"><label>Endpoint</label><input type="text" id="stoEndpoint" placeholder="https://minio.example.com"></div>
+                <div class="form-group"><label>Bucket</label><input type="text" id="stoBucket" placeholder="remindflow-backup"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>AccessKey</label><input type="text" id="stoAK" placeholder="AccessKey"></div>
+                    <div class="form-group"><label>SecretKey</label><input type="password" id="stoSK" placeholder="SecretKey"></div>
+                </div>
+                <div id="storageStatus" style="display:none;margin-top:4px;font-size:12px;color:var(--text-secondary);line-height:1.7;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('storageModal')">取消</button>
+                <button class="btn btn-secondary" onclick="backupNow()" id="btnBackupNow">☁️ 立即备份</button>
+                <button class="btn btn-primary" onclick="saveStorage()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script>
+        renderShell('settings', '系统设置');
+
+        var THEMES = [
+            { key: 'green', color: '#4CAF50' }, { key: 'blue', color: '#3b82f6' },
+            { key: 'indigo', color: '#6366f1' }, { key: 'purple', color: '#a855f7' },
+            { key: 'orange', color: '#f97316' }, { key: 'red', color: '#ef4444' }
+        ];
+        var cfg = {};
+
+        async function init() {
+            const uname = getUsername();
+            document.getElementById('profileName').textContent = uname;
+            document.getElementById('profileDesc').textContent = uname + ' · 管理员';
+            document.getElementById('profileAvatar').textContent = uname.charAt(0).toUpperCase();
+            document.getElementById('modalAvatar').textContent = uname.charAt(0).toUpperCase();
+            document.getElementById('modalName').textContent = uname;
+            /* v71：复用 common.js 的在途去重配置加载，避免首屏 /api/settings/config 重复请求 */
+            let d = null;
+            try { await loadAppConfig(); d = (typeof FEATURE_FLAGS !== 'undefined') ? FEATURE_FLAGS : null; } catch (e) { }
+            if (!d) { const r = await apiGet('/api/settings/config'); if (r && r.code === 200) d = r.data; }
+            if (d) {
+                cfg = d;
+                fillSwitches();
+            }
+            await loadPushCfg();
+            await loadBackupPanel();
+            // 从首页「去开启每日推送」跳转而来（/settings?push=1）：滚动到推送设置区并自动打开配置弹窗
+            if (/[?&]push=1/.test(location.search)) {
+                setTimeout(() => {
+                    const anchor = document.getElementById('pushGroup');
+                    if (anchor) { try { anchor.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { } }
+                    setTimeout(() => { if (typeof showPushModal === 'function') showPushModal(); }, 320);
+                }, 120);
+            }
+        }
+        function fillSwitches() {
+            setSw('swNotifyGift', cfg.notifyGift); setSw('swNotifyExpiry', cfg.notifyExpiry);
+            setSw('swNotifyLoan', cfg.notifyLoan);
+            // P2-5a：featXxx 数据开关已迁移到「模块管理」页，此处不再操作对应 DOM
+            setSw('swShowAiFloat', cfg.showAiFloat);
+            setSw('swAllowReg', cfg.allowRegistration);
+            setSw('swTelemetry', cfg.telemetry);
+            document.getElementById('mapKeyDesc').textContent = cfg.mapKey
+                ? '已配置（' + String(cfg.mapKey).slice(0, 4) + '****' + String(cfg.mapKey).slice(-4) + '）—— 地点搜索 / 逆地理已启用'
+                : '未配置 —— 配置后启用地点搜索 / 逆地理定位；轨迹底图为高德瓦片，无需 Key';
+            const si = document.getElementById('selTrackInterval');
+            if (si) si.value = String(cfg.trackAutoInterval || 10);
+            const fr = document.getElementById('selFpRule');
+            if (fr) fr.value = String((cfg.fpRule && cfg.fpRule.minStayMinutes) || 0);
+            document.getElementById('spaceDesc').textContent = '当前：' + (cfg.defaultSpace || '个人空间');
+            document.getElementById('remindDesc').textContent = cfg.remindDetect === false
+                ? '提醒检测已关闭'
+                : '每5分钟检测一次提醒，提前 ' + (cfg.remindLeadHours || 5) + ' 小时';
+        }
+        function setSw(id, v) { const el = document.getElementById(id); if (el) el.checked = !!v; }
+
+        /* ---- 位置轨迹：腾讯地图 Key / 自动记录间隔 ---- */
+        function showMapKeyModal() {
+            document.getElementById('inpMapKey').value = (cfg && cfg.mapKey) || '';
+            openModal('mapKeyModal');
+        }
+        async function saveMapKey() {
+            const key = document.getElementById('inpMapKey').value.trim();
+            const r = await apiPut('/api/settings/config', { mapKey: key });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            cfg.mapKey = key;
+            closeModal('mapKeyModal');
+            fillSwitches();
+            showToast(key ? '地图 Key 已保存，轨迹页即可使用地点搜索 / 逆地理定位' : '已清空地图 Key，地点搜索 / 逆地理将不可用（高德底图不受影响）');
+        }
+        /* ---- 微信订阅消息配置 ---- */
+        function showWechatModal() {
+            loadWechatCfg();
+            openModal('wechatModal');
+        }
+        async function loadWechatCfg() {
+            const r = await apiGet('/api/wechat/config');
+            if (!r || r.code !== 200 || !r.data) return;
+            const w = r.data;
+            document.getElementById('inpWxAppId').value = w.appId || '';
+            document.getElementById('inpWxTpl').value = w.templateId || '';
+            document.getElementById('inpWxPage').value = w.page || 'pages/dashboard/dashboard';
+            document.getElementById('wxSecretHint').textContent = w.appSecretSet ? '已配置（留空则保持不变）' : '尚未配置';
+            const fields = (w.tplFields && w.tplFields.length) ? w.tplFields : [{ key: 'thing1', label: '提醒标题', value: '{{text}}' }, { key: 'time2', label: '时间', value: '{{datetime}}' }];
+            renderWxFields(fields);
+        }
+        let wxFields = [];
+        function renderWxFields(list) {
+            wxFields = list || [];
+            const box = document.getElementById('wxTplFields');
+            box.innerHTML = wxFields.map(function (f, i) {
+                return '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">' +
+                    '<input type="text" placeholder="字段key" value="' + escAttr(f.key) + '" data-i="' + i + '" data-k="key" oninput="updWxField(this)" style="width:90px;">' +
+                    '<input type="text" placeholder="说明" value="' + escAttr(f.label) + '" data-i="' + i + '" data-k="label" oninput="updWxField(this)" style="width:90px;">' +
+                    '<input type="text" placeholder="值/占位符" value="' + escAttr(f.value) + '" data-i="' + i + '" data-k="value" oninput="updWxField(this)" style="flex:1;min-width:0;">' +
+                    '<button class="btn btn-secondary btn-sm" type="button" onclick="delWxField(' + i + ')">✕</button>' +
+                    '</div>';
+            }).join('');
+        }
+        function updWxField(el) {
+            const i = +el.dataset.i, k = el.dataset.k;
+            if (wxFields[i]) wxFields[i][k] = el.value;
+        }
+        function addWxField() { wxFields.push({ key: '', label: '', value: '' }); renderWxFields(wxFields); }
+        function delWxField(i) { wxFields.splice(i, 1); renderWxFields(wxFields); }
+        async function saveWechatCfg() {
+            const payload = {
+                appId: document.getElementById('inpWxAppId').value.trim(),
+                appSecret: document.getElementById('inpWxSecret').value.trim(),
+                templateId: document.getElementById('inpWxTpl').value.trim(),
+                page: document.getElementById('inpWxPage').value.trim() || 'pages/dashboard/dashboard',
+                tplFields: wxFields.filter(function (f) { return f.key && f.key.trim(); }).map(function (f) { return { key: f.key.trim(), label: f.label || f.key, value: f.value || '' }; })
+            };
+            const r = await apiPut('/api/settings/config', { wechat: payload });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            closeModal('wechatModal');
+            showToast('微信订阅消息配置已保存');
+        }
+        function escAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+        async function saveTrackInterval(v) {
+            const r = await apiPut('/api/settings/config', { trackAutoInterval: +v });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            cfg.trackAutoInterval = +v;
+            showToast('自动记录间隔已设为 ' + v + ' 分钟');
+        }
+
+        /* ---- G5 城市点亮规则：minStayMinutes 分钟（0 = 打卡即点亮） ---- */
+        async function saveFpRule(v) {
+            const r = await apiPut('/api/settings/config', { fpRule: { minStayMinutes: +v } });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            cfg.fpRule = { minStayMinutes: +v };
+            showToast(+v ? '已设为停留 ' + v + ' 分钟才点亮城市（手动点亮不受影响）' : '已恢复打卡即点亮');
+        }
+
+        async function saveFlag(key, val) {
+            const body = {}; body[key] = val;
+            const r = await apiPut('/api/settings/config', body);
+            if (r.code === 200) {
+                cfg[key] = val;
+                localStorage.setItem('featureFlags', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('featureFlags') || '{}'), body)));
+                applyFeatureFlags();
+                showToast('已保存');
+                if (key === 'allowRegistration') fillSwitches();
+            } else showToast(r.message || '保存失败', 'error');
+        }
+
+        /* ---- 消息推送 ---- */
+        let pushCfg = null;
+        async function loadPushCfg() {
+            const r = await apiGet('/api/push-config');
+            if (!r || r.code !== 200 || !r.data) return;
+            pushCfg = r.data;
+            setSw('swPushEnabled', pushCfg.enabled);
+            setSw('swRequirePwdChange', pushCfg.requirePwdChange);
+            document.getElementById('inpPushTime').value = pushCfg.dailyTime || '08:00';
+            document.getElementById('selPushLead').value = String(pushCfg.leadDays === undefined ? 3 : pushCfg.leadDays);
+            const sel = document.getElementById('selPushChannel');
+            sel.innerHTML = (pushCfg.supported || []).map(c => '<option value="' + c.key + '">' + c.label + '</option>').join('');
+            sel.value = pushCfg.channel || 'wecom';
+            onPushChannelChange();
+            fillPushDesc();
+        }
+        const PUSH_EX = {
+            wecom: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=XXX',
+            feishu: 'https://open.feishu.cn/open-apis/bot/v2/hook/XXX',
+            dingtalk: 'https://oapi.dingtalk.com/robot/send?access_token=XXX',
+            serverchan: 'https://sctapi.ftqq.com/XXX.send',
+            pushplus: 'https://www.pushplus.plus/send',
+            bark: 'https://api.day.app/XXX'
+        };
+        function onPushChannelChange() {
+            const k = document.getElementById('selPushChannel').value;
+            const c = ((pushCfg && pushCfg.supported) || []).find(x => x.key === k);
+            document.getElementById('pushChannelHint').textContent = c ? ('Webhook 域名必须是 ' + c.host) : '';
+            document.getElementById('inpPushHook').placeholder = PUSH_EX[k] || '';
+        }
+        function fillPushDesc() {
+            const d = pushCfg || {};
+            document.getElementById('pushDesc').textContent = d.enabled
+                ? ('已开启 · 每天 ' + (d.dailyTime || '08:00') + ' 推送到手机')
+                : (d.hasWebhook ? '已配置机器人但未开启，打开右侧开关即生效' : '未配置机器人，先点下方填写 Webhook');
+            document.getElementById('pushHookDesc').textContent = d.hasWebhook ? ('已配置：' + d.webhookMasked) : '未配置（企业微信 / 飞书 / 钉钉 / Server酱 / Bark）';
+            document.getElementById('pushLastDesc').textContent = d.lastSentDate
+                ? ('上次推送 ' + d.lastSentDate + ' · ' + (d.lastResult || ''))
+                : '保存配置后点这里验证能否收到';
+        }
+        function showPushModal() {
+            document.getElementById('inpPushHook').value = '';
+            document.getElementById('inpPushBase').value = (pushCfg && pushCfg.baseUrl) || '';
+            document.getElementById('inpPushTimeM').value = (pushCfg && pushCfg.dailyTime) || '08:00';
+            openModal('pushModal');
+        }
+        async function savePushWebhook() {
+            const body = {
+                channel: document.getElementById('selPushChannel').value,
+                baseUrl: document.getElementById('inpPushBase').value.trim(),
+                dailyTime: document.getElementById('inpPushTimeM').value || '08:00',
+                enabled: true
+            };
+            const hook = document.getElementById('inpPushHook').value.trim();
+            if (hook) body.webhook = hook;
+            const r = await apiPut('/api/push-config', body);
+            if (!r || r.code !== 200) return showToast((r && r.message) || '保存失败', 'error');
+            closeModal('pushModal');
+            await loadPushCfg();
+            showToast('✅ 推送已开启');
+        }
+        async function savePushCfg(body, el) {
+            const r = await apiPut('/api/push-config', body);
+            if (!r || r.code !== 200) {
+                showToast((r && r.message) || '保存失败', 'error');
+                if (el && el.type === 'checkbox') el.checked = !el.checked;
+                return;
+            }
+            await loadPushCfg();
+            showToast('已保存');
+        }
+        async function testPush() {
+            const desc = document.getElementById('pushLastDesc');
+            const old = desc.textContent;
+            desc.textContent = '发送中…';
+            const r = await apiPost('/api/push/test', {});
+            desc.textContent = old;
+            if (!r || r.code !== 200) return showToast((r && r.message) || '发送失败', 'error');
+            showToast((r && r.message) || '已发送，请看手机', 'success');
+            loadPushCfg();
+        }
+
+        /* 弹窗逻辑 */
+        function showProfileModal() { openModal('profileModal'); }
+        function showRenameModal() { document.getElementById('newUsername').value = getUsername(); openModal('renameModal'); }
+        async function saveRename() {
+            const v = document.getElementById('newUsername').value.trim();
+            if (!v) return showToast('请输入用户名', 'warning');
+            const r = await apiPut('/api/users/me', { username: v });
+            if (r.code === 200) {
+                localStorage.setItem('username', v);
+                showToast('用户名已更新，即将刷新');
+                setTimeout(() => location.reload(), 1000);
+            } else showToast(r.message || '修改失败', 'error');
+        }
+        function showPwdModal() { ['oldPwd', 'newPwd', 'newPwd2'].forEach(id => document.getElementById(id).value = ''); openModal('pwdModal'); }
+        async function savePwd() {
+            const o = document.getElementById('oldPwd').value, n = document.getElementById('newPwd').value, n2 = document.getElementById('newPwd2').value;
+            if (!o || !n) return showToast('请填写完整', 'warning');
+            if (n.length < 6) return showToast('新密码至少6位', 'warning');
+            if (n !== n2) return showToast('两次输入的新密码不一致', 'warning');
+            const r = await apiPut('/api/users/change-password', { oldPassword: o, newPassword: n });
+            if (r.code === 200) { showToast('密码修改成功，请重新登录'); setTimeout(logout, 1200); }
+            else showToast(r.message || '修改失败', 'error');
+        }
+        function showSpaceModal() {
+            document.getElementById('spaceSelect').value = cfg.defaultSpace || '个人空间';
+            openModal('spaceModal');
+        }
+        async function saveSpace() {
+            const v = document.getElementById('spaceSelect').value;
+            await saveFlag('defaultSpace', v);
+            document.getElementById('spaceDesc').textContent = '当前：' + v;
+            closeModal('spaceModal');
+        }
+        function showRemindModal() {
+            document.getElementById('remindOn').checked = cfg.remindDetect !== false;
+            document.getElementById('remindLead').value = String(cfg.remindLeadHours || 5);
+            openModal('remindModal');
+        }
+        async function saveRemind() {
+            await saveFlag('remindDetect', document.getElementById('remindOn').checked);
+            await saveFlag('remindLeadHours', +document.getElementById('remindLead').value);
+            fillSwitches(); closeModal('remindModal');
+        }
+        function showThemeModal() {
+            applyThemeMode(localStorage.getItem('theme') || 'light');
+            applyFontSize(localStorage.getItem('fontSize') || 'normal');
+            renderThemeDots(); openModal('themeModal');
+        }
+        /* 外观模式：light / dark / auto（跟随系统） */
+        function applyThemeMode(mode) {
+            const m = mode === 'dark' || mode === 'light' || mode === 'auto' ? mode : 'light';
+            localStorage.setItem('theme', m);
+            const dark = m === 'dark' || (m === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+            document.querySelectorAll('#themeModeSeg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+            return dark;
+        }
+        async function pickThemeMode(mode) {
+            applyThemeMode(mode);
+            try { await apiPut('/api/settings/config', { theme: mode }); } catch (e) { /* 本地已生效，静默 */ }
+        }
+        function applyFontSize(size) {
+            const s = size === 'large' ? 'large' : 'normal';
+            localStorage.setItem('fontSize', s);
+            document.documentElement.setAttribute('data-font-size', s);
+            document.querySelectorAll('#fontSizeSeg .seg-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === s));
+        }
+        async function pickFontSize(size) {
+            applyFontSize(size);
+            showToast(size === 'large' ? '已开启大字模式' : '已恢复标准字号');
+            try { await apiPut('/api/settings/config', { fontSize: size === 'large' ? 'large' : 'normal' }); } catch (e) { /* 本地已生效，静默 */ }
+        }
+        function renderThemeDots() {
+            const cur = localStorage.getItem('themeColor') || 'green';
+            document.getElementById('themeDots').innerHTML = THEMES.map(t =>
+                '<span class="theme-dot ' + (t.key === cur ? 'active' : '') + '" style="background:' + t.color + ';" title="' + t.key + '" onclick="pickTheme(\'' + t.key + '\')"></span>').join('');
+        }
+        async function pickTheme(key) {
+            localStorage.setItem('themeColor', key);
+            document.documentElement.setAttribute('data-theme-color', key);
+            renderThemeDots();
+            await apiPut('/api/settings/config', { themeColor: key });
+        }
+        function showDataModal() { openModal('dataModal'); }
+        function exportData() {
+            window.open('/api/settings/export', '_blank');
+            showToast('已开始下载备份');
+        }
+        function exportFull() {
+            window.open('/api/settings/export-full', '_blank');
+            showToast('已开始下载完整备份（ZIP）');
+        }
+        function showStorageModal() {
+            const s = cfg.storageApi || {};
+            document.getElementById('stoEndpoint').value = s.endpoint || '';
+            document.getElementById('stoBucket').value = s.bucket || '';
+            document.getElementById('stoAK').value = s.accessKey || '';
+            document.getElementById('stoSK').value = s.secretKey || '';
+            renderStorageStatus(s);
+            openModal('storageModal');
+        }
+        function renderStorageStatus(s) {
+            const el = document.getElementById('storageStatus');
+            s = s || cfg.storageApi || {};
+            const configured = s.endpoint && s.bucket && s.accessKey && s.secretKey;
+            let html = '';
+            if (configured) {
+                html += '✅ 已配置：<span>' + escHtml(String(s.endpoint)) + ' / ' + escHtml(String(s.bucket)) + '</span>';
+            } else {
+                html += '⚠️ 未配置完整 —— 填好上方 4 项并保存后，才能一键备份';
+            }
+            if (s.lastBackup && s.lastBackup.at) {
+                html += '<br>🕒 最近备份：' + escHtml(s.lastBackup.at) + '（' + escHtml(String(s.lastBackup.key || '')) + '）';
+            }
+            el.style.display = 'block';
+            el.innerHTML = html;
+        }
+        async function saveStorage() {
+            const obj = {
+                endpoint: document.getElementById('stoEndpoint').value.trim(),
+                bucket: document.getElementById('stoBucket').value.trim(),
+                accessKey: document.getElementById('stoAK').value.trim(),
+                secretKey: document.getElementById('stoSK').value.trim()
+            };
+            // 覆盖式保存：保留已记录的最近备份信息（lastBackup）
+            const old = (cfg.storageApi || {}).lastBackup;
+            if (old) obj.lastBackup = old;
+            await saveFlag('storageApi', obj);
+            renderStorageStatus(obj);
+            showToast('对象存储配置已保存');
+            closeModal('storageModal');
+        }
+        async function backupNow() {
+            const btn = document.getElementById('btnBackupNow');
+            const oldTxt = btn.textContent;
+            btn.disabled = true; btn.textContent = '☁️ 备份中…';
+            try {
+                const r = await apiPost('/api/settings/backup-cloud', {});
+                if (r.code === 200 && r.data) {
+                    showToast('云备份成功');
+                    cfg.storageApi = Object.assign({}, cfg.storageApi || {}, r.data);
+                    renderStorageStatus();
+                } else {
+                    showToast(r.message || '云备份失败', 'error');
+                    renderStorageStatus();
+                }
+            } catch (e) {
+                showToast('云备份失败：' + (e && e.message ? e.message : e), 'error');
+            } finally {
+                btn.disabled = false; btn.textContent = oldTxt;
+            }
+        }
+        async function doImport(input) {
+            const file = input && input.files && input.files[0];
+            if (!file) return;
+            const el = document.getElementById('importStatus');
+            el.style.display = 'block';
+            el.textContent = '读取文件…';
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (typeof data !== 'object' || data === null || Array.isArray(data)) throw new Error('不是有效 JSON 对象');
+                el.textContent = '';
+                const okGo = await confirmModal({
+                    title: '确认导入备份？',
+                    message: '将覆盖当前全部数据（导入前会自动生成本地时间戳备份兜底）。\n\n请确认这是你要导入的备份。',
+                    danger: true,
+                    confirmText: '导入'
+                });
+                if (!okGo) { el.textContent = '已取消导入'; input.value = ''; return; }
+                el.textContent = '正在导入…';
+                const r = await apiPost('/api/settings/import', { data: data });
+                if (r.code === 200) {
+                    el.innerHTML = '✅ ' + escHtml(r.message || '导入成功');
+                    showToast('导入成功，数据已覆盖');
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    el.innerHTML = '❌ ' + escHtml(r.message || '导入失败');
+                    input.value = '';
+                }
+            } catch (e) {
+                el.innerHTML = '❌ ' + escHtml(e && e.message ? e.message : '导入失败：文件解析错误');
+                input.value = '';
+            }
+        }
+
+        /* ---- 数据备份（完整还原点） ---- */
+        var backupStatusData = null;
+        async function loadBackupPanel() {
+            const g = document.getElementById('backupGroup');
+            const st = await apiGet('/api/backup/status');
+            if (!st || st.code !== 200 || !st.data) {
+                /* 未登录 / 非管理员：按页面既有约定隐藏面板（权限不足不打扰普通用户） */
+                if (g) g.style.display = 'none';
+                return;
+            }
+            backupStatusData = st.data;
+            if (g) g.style.display = '';
+            setSw('swBackupEnabled', backupStatusData.enabled);
+            document.getElementById('inpBackupRemote').value = backupStatusData.remoteDir || '';
+            renderBackupDesc();
+        }
+        function fmtBackupSize(bytes) {
+            bytes = +bytes || 0;
+            if (bytes < 0) return '未知';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+            return (bytes / 1073741824).toFixed(1) + ' GB';
+        }
+        function renderBackupDesc() {
+            const d = backupStatusData || {};
+            document.getElementById('backupEnabledDesc').textContent = d.enabled
+                ? '已开启，每天自动生成一份完整还原点'
+                : '已关闭，数据将不再自动备份（建议保持开启）';
+            const re = document.getElementById('backupRemoteDesc');
+            if (!d.remoteDir) {
+                re.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 未配置 —— 当前备份和数据在<b>同一块盘</b>上，这块盘坏了两个一起没。建议填一个 U 盘 / 移动硬盘 / 另一块盘的目录。';
+            } else if (d.sameDisk) {
+                re.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 已配置：' + escHtml(d.remoteDir) + '，但它和数据库在<b>同一块盘</b>上，这块盘坏了两个一起没。请换到另一块盘或 U 盘。';
+            } else {
+                re.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 已配置：' + escHtml(d.remoteDir) + '（不同盘，磁盘损坏也有一份独立副本）';
+            }
+            document.getElementById('backupStatDesc').innerHTML =
+                '最近一次：' + (d.lastRunDate ? escHtml(d.lastRunDate + ' · ' + (d.lastResult || '')) : '尚未备份') +
+                '<br>已保留 ' + (d.dirCount || 0) + ' 个备份点，共占用 ' + fmtBackupSize(d.totalBytes);
+            const r = d.retention || {};
+            document.getElementById('backupRetentionDesc').textContent =
+                '最近 ' + r.keepDays + ' 天每天留 1 份；更早的每周留 1 份（最多 ' + r.keepWeeks + ' 份）、每月留 1 份（最多 ' + r.keepMonths +
+                ' 份）；总计最多 ' + r.maxDirs + ' 份。旧备份会自动清理，不用手动删。';
+        }
+        async function saveBackupCfg(body) {
+            const r = await apiPost('/api/backup/config', body);
+            if (!r || r.code !== 200) return showToast((r && r.message) || '保存失败', 'error');
+            backupStatusData = r.data || backupStatusData;
+            setSw('swBackupEnabled', backupStatusData.enabled);
+            renderBackupDesc();
+            showToast('已保存');
+        }
+        async function saveBackupRemote() {
+            const v = document.getElementById('inpBackupRemote').value.trim();
+            await saveBackupCfg({ remoteDir: v });
+        }
+        /* ---- 检测可用备份位置：把「该填什么路径」变成一次点击 ---- */
+        var backupVolCands = [];
+        async function detectBackupVolumes() {
+            const box = document.getElementById('backupVolBox');
+            box.style.display = '';
+            box.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">正在检测…</div>';
+            const r = await apiGet('/api/backup/volumes');
+            if (!r || r.code !== 200 || !r.data) {
+                box.innerHTML = '<div style="font-size:12px;color:var(--danger);">检测失败：' + escHtml((r && r.message) || '未知原因') + '</div>';
+                return;
+            }
+            const d = r.data;
+            backupVolCands = d.candidates || [];
+            let h = '';
+            if (!backupVolCands.length) {
+                h += '<div style="font-size:12px;color:var(--danger);line-height:1.8;">本机没有检测到「另一块盘」：数据在 <b>' + escHtml(d.dataVolume || '') +
+                    '</b>，其余可读位置都在同一块盘上。<br>这种情况只能借助外部位置 —— U 盘 / 移动硬盘 / 网络共享（NAS）/ 云盘同步目录，' +
+                    '把它的绝对路径直接填进上面的输入框即可（例如 <code>\\\\NAS\\backup</code>）。</div>';
+            } else {
+                h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;">检测到 ' + backupVolCands.length + ' 个非同盘位置，点「填入」再点「保存」：</div>';
+                backupVolCands.forEach(function (v, i) {
+                    h += '<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border-color);">' +
+                        '<span style="font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+                        escHtml(v.path) + '<span style="color:var(--text-secondary);"> · 可用 ' + fmtBackupSize(v.freeBytes) + '</span></span>' +
+                        '<button class="btn btn-secondary btn-sm" type="button" onclick="fillBackupRemoteByIdx(' + i + ')">填入</button></div>';
+                });
+                h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;line-height:1.8;">ℹ️ ' + escHtml(d.sameMachineCaveat || '') + '</div>';
+            }
+            box.innerHTML = h;
+        }
+        function fillBackupRemoteByIdx(i) {
+            const v = backupVolCands[i];
+            if (!v) return;
+            document.getElementById('inpBackupRemote').value = v.path;
+            showToast('已填入 ' + v.path + '，请点「保存」生效');
+        }
+        async function runBackupNow() {
+            const desc = document.getElementById('backupRunDesc');
+            const old = desc.textContent;
+            desc.textContent = '备份中…';
+            const r = await apiPost('/api/backup/run', {});
+            desc.textContent = old;
+            if (!r || r.code !== 200) {
+                showToast((r && r.message) || '备份失败', 'error');
+            } else {
+                const d = r.data || {};
+                showToast('备份完成：' + (d.fileCount || 0) + ' 个文件' + ((d.remote && d.remote.ok) ? '，已复制到异地' : ''));
+            }
+            loadBackupPanel();
+        }
+        async function verifyLatestBackup() {
+            const list = await apiGet('/api/backup/list');
+            if (!list || list.code !== 200 || !(list.data || []).length) return showToast('还没有任何备份点，请先点「立即备份」', 'warning');
+            const latest = list.data[0];
+            const r = await apiPost('/api/backup/verify', { date: latest.date });
+            if (r && r.code === 200 && r.data && r.data.ok) {
+                showToast('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 最新备份（' + latest.date + '）校验通过，数据完好');
+            } else {
+                const detail = (r && r.data && (r.data.error || ((r.data.mismatches || []).length + ' 个文件不一致'))) || '未知原因';
+                showToast('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 备份校验异常：' + detail, 'error');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

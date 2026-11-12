@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康记录 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* 移动端首屏修复：压缩 #medRows（药品录入表单）上方间距，避免被底部固定 Tab 栏遮挡 */
+        @media (max-width:768px) {
+            /* 卡片纵向内边距 20→12，左右保持20px，不影响宽度、不产生横向滚动 */
+            #pageContent .card { padding-top: 12px; padding-bottom: 12px; }
+            /* 卡片标题区与内容间距 16→10 */
+            #pageContent .card-header { margin-bottom: 10px; }
+            /* 复诊提醒每行纵向内距 10→4；行内联样式需 !important；仅命中 #reminderList，不波及体征记录行 */
+            #reminderList .expiry-row { padding-top: 4px !important; padding-bottom: 4px !important; }
+            /* 档案卡内小节标题上下间距压缩（覆盖行内联 margin；注：#profileTitle 在 .card-header 内非兄弟，故按 #pageContent 作用域） */
+            #pageContent .section-title { margin-top: 6px !important; margin-bottom: 2px !important; }
+            /* 慢性病/过敏史/用药表单行下间距 6→0 */
+            #chronicRows .form-inline, #allergyRows .form-inline, #medRows .form-inline { margin-bottom: 0 !important; }
+            /* 家人 chips 两行间距 8→4 */
+            #memberTabs { gap: 4px !important; }
+        }
+        /* ---- 健康档案动态表单行统一（慢性病/过敏/用药/复诊） ---- */
+        .h-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+        .h-row > input { height:44px; flex:1; min-width:88px; padding:0 12px; border:1px solid var(--border,#e2e8f0); border-radius:10px; background:var(--card-bg); color:var(--text,#1f2937); font-size:14px; outline:none; transition:border-color .2s, box-shadow .2s; }
+        .h-row > input:focus { border-color:var(--brand,#2563eb); box-shadow:0 0 0 3px rgba(79,124,255,.14); background:var(--card-bg); }
+        .h-row .h-del { height:44px; width:48px; flex-shrink:0; border:none; border-radius:10px; background:var(--danger-light,#fee2e2); color:#b91c1c; font-size:15px; font-weight:600; cursor:pointer; transition:background .15s, transform .15s; }
+        .h-row .h-del:hover { background:#fecaca; }
+        .h-row .h-del:active { transform:scale(.94); }
+        /* v1.48.37：暗色下 --danger-light 是 12% 红，深红字压上去只有 2.58 → 换亮档 6.51；
+           hover 的 #fecaca 在暗色下会变成一块亮粉，一并压回半透明红。 */
+        [data-theme="dark"] .h-row .h-del { color:#fca5a5; }
+        [data-theme="dark"] .h-row .h-del:hover { background:rgba(248,113,113,.22); }
+        .h-row .h-remind { display:flex; align-items:center; gap:5px; height:44px; padding:0 6px; font-size:13px; color:var(--text-secondary,#64748b); cursor:pointer; flex-shrink:0; }
+        .h-row .h-remind input { width:16px; height:16px; accent-color:var(--brand,#2563eb); }
+        /* FIX-29：窄屏（≤480px）用药行重排——日期框独占一行，避免 320px 下「2026/10/05」被裁断；其余输入两列排布 */
+        @media (max-width:480px) {
+            #medRows .h-row > input[type="date"] { flex:0 0 100%; min-width:0; }
+            #medRows .h-row > input:not([type="date"]) { flex:1 1 calc(50% - 8px); min-width:0; }
+        }
+
+        /* ===== F2 重构：圆角大卡 / 品牌竖条 / 空状态（只改容器与样式，不动任何数据逻辑） ===== */
+        /* 主题大卡：18px 圆角 + 充足留白 + 沿用 var(--shadow) */
+        .h-card { border-radius:18px; box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+        @media (max-width:768px) {
+            /* 覆盖移动端首屏压缩后的卡片内边距，给出参考图式留白（行间距压缩规则保留不删） */
+            #pageContent .h-card { padding:16px 14px; margin-bottom:12px; }
+        }
+        /* 卡片头：左侧品牌渐变竖条（3~4px 圆角）+ 标题 */
+        .h-card-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+        .h-bar { width:4px; height:16px; border-radius:99px; background:var(--grad-brand); flex-shrink:0; }
+        .h-card-title { font-size:15px; font-weight:700; color:var(--text); line-height:1.3; }
+        .h-card-head .spacer { flex:1; }
+        .h-card-head .h-hint { font-size:12px; color:var(--text-secondary); }
+
+        /* 空状态：灰色「暂无数据」小字；容器有记录时用 :not(:empty) 自动隐藏 */
+        .h-empty { text-align:center; color:var(--text-secondary); font-size:13px; padding:14px 0 2px; }
+        #chronicRows:not(:empty) + .h-empty,
+        #allergyRows:not(:empty) + .h-empty,
+        #medRows:not(:empty) + .h-empty,
+        #checkupRows:not(:empty) + .h-empty { display:none; }
+
+        /* 卡片内轻量添加按钮：虚线胶囊，44px 触控高度 */
+        .h-addbtn { display:block; width:100%; height:44px; margin-top:10px; border:1.5px dashed rgba(79,124,255,.45); border-radius:12px; background:transparent; color:var(--primary-text); font-size:13px; font-weight:600; cursor:pointer; transition:background .15s, transform .1s; }
+        .h-addbtn:active { transform:scale(.98); }
+
+        /* 健康备注 textarea 和谐化 */
+        #pNotes { width:100%; min-height:80px; padding:12px 14px; border:1px solid var(--border,#e2e8f0); border-radius:12px; background:var(--card-bg); color:var(--text,#1f2937); font-size:14px; line-height:1.6; outline:none; resize:vertical; transition:border-color .2s, box-shadow .2s; box-sizing:border-box; }
+        #pNotes:focus { border-color:var(--brand,#2563eb); box-shadow:0 0 0 3px rgba(79,124,255,.14); }
+
+        /* chips 标签样式（慢性病/过敏史已保存项） */
+        .chip-tag { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; margin:0 8px 8px 0; background:rgba(37,99,235,.08); color:var(--primary-text); border-radius:20px; font-size:13px; font-weight:500; }
+        .chip-tag .chip-x { cursor:pointer; font-weight:700; opacity:.6; font-size:14px; }
+        .chip-tag .chip-x:hover { opacity:1; }
+        .h-chip-input { border:none; outline:none; background:transparent; padding:8px 4px; font-size:13px; color:var(--text-secondary); min-width:160px; }
+        .h-chip-input::placeholder { color:var(--text-secondary); }
+
+        /* 展示行（复诊提醒 / 体征记录）软块化：去掉生硬分割线，改浅底圆角块 */
+        #reminderList .expiry-row, #vitalsList .expiry-row { background:rgba(79,124,255,.06); border-radius:12px; padding:12px !important; margin-bottom:8px; border-bottom:none !important; }
+
+        /* 家人 chips 胶囊化，触控高度 ≥44px */
+        #memberTabs { display:flex; gap:8px; flex-wrap:wrap; }
+        #memberTabs .btn { min-height:44px; border-radius:99px; padding:0 16px; }
+    </style>
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- 近期复诊提醒 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg> 近期复诊</span>
+                <span class="spacer"></span>
+                <span class="status-tag" style="background:var(--primary-light);color:var(--primary);" id="reminderCount">0 项</span>
+            </div>
+            <div id="reminderList"></div>
+        </div>
+
+
+        <!-- ===== 健康总览仪表盘（v1.37.0，华为风） ===== -->
+<!-- ============================================================
+  健康总览仪表盘（任务B - 插入在「选择家人」卡上方）
+  纯 DOM + 内嵌 CSS + 原生 JS，不引外部库
+  ============================================================ -->
+<style>
+  /* ===== 仪表盘区块根容器 ===== */
+  .hdash-wrap { margin-bottom: 16px; }
+
+  /* ===== 1. 健康洞察卡 ===== */
+  .hdash-insight {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 20px 18px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 12px rgba(100, 120, 200, 0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .hdash-insight::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 16px; bottom: 16px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(180deg, #3b82f6, #3b82f6, #3b82f6);
+  }
+  .hdash-insight-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .hdash-insight-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-left: 8px;
+  }
+  .hdash-insight-more {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 4px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .hdash-insight-sub {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    margin-left: 8px;
+  }
+  .hdash-insight-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    margin-left: 8px;
+  }
+  .hdash-insight-num {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .hdash-insight-num .num {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #3b82f6, #3b82f6, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+  }
+  .hdash-insight-num .unit {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+  .hdash-insight-num .label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: block;
+    margin-top: 2px;
+  }
+  .hdash-insight-icon {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+  }
+  .hdash-insight-list {
+    margin-left: 8px;
+  }
+  .hdash-insight-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid var(--border-color);
+    gap: 10px;
+  }
+  .hdash-insight-item:first-child { border-top: none; }
+  .hdash-insight-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .hdash-insight-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+  .hdash-insight-pill {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .hdash-pill-gray { background: var(--bg-secondary); color: #6b7280; }
+  .hdash-pill-blue { background: #eef2ff; color: #1d4ed8; }
+  .hdash-pill-green { background: #ecfdf5; color: #047857; }
+  .hdash-pill-red { background: #fef2f2; color: #b91c1c; }
+  .hdash-insight-empty {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-left: 8px;
+  }
+
+  /* ===== 2. 指标卡网格 ===== */
+  .hdash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .hdash-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 16px 14px;
+    box-shadow: 0 2px 10px rgba(100, 120, 200, 0.05);
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+  }
+  .hdash-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+  .hdash-card-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .hdash-card-unit {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+  .hdash-card-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: auto;
+    padding-top: 8px;
+  }
+  .hdash-card-link {
+    font-size: 13px;
+    color: var(--primary-text);
+    text-decoration: none;
+    margin-top: auto;
+    padding-top: 8px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* 体重 BMI 仪表盘 */
+  .hdash-bmi-gauge {
+    width: 100%;
+    height: 50px;
+    margin: 6px 0;
+  }
+
+  /* 血压水滴装饰 */
+  .hdash-bp-deco {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 56px;
+    height: 56px;
+    opacity: 0.9;
+  }
+  .hdash-card-bp { position: relative; overflow: hidden; }
+
+  /* 空状态 */
+  .hdash-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 8px;
+    padding: 12px 0;
+  }
+  .hdash-empty-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .hdash-empty-add {
+    border: 1.5px dashed #c7d2fe;
+    color: var(--primary-text);
+    background: transparent;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ===== 3. 快捷功能行 ===== */
+  .hdash-quick {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 10px rgba(100, 120, 200, 0.05);
+    cursor: pointer;
+    min-height: 56px;
+  }
+  .hdash-quick-icons {
+    display: flex;
+    align-items: center;
+  }
+  .hdash-quick-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border: 2px solid #fff;
+    margin-left: -8px;
+  }
+  .hdash-quick-icon:first-child { margin-left: 0; }
+  .hdash-quick-icon-weight { background: #dbeafe; color: #1d4ed8; }
+  .hdash-quick-icon-bp { background: #dbeafe; color: #1d4ed8; }
+  .hdash-quick-icon-med { background: #f3e8ff; color: #1d4ed8; }
+  .hdash-quick-icon-checkup { background: #cffafe; color: #1d4ed8; }
+  .hdash-quick-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  .hdash-quick-plus {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f3f4f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--text-secondary);
+    font-weight: 300;
+  }
+
+  /* ===== 快捷功能 Action Sheet ===== */
+  .hdash-sheet-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 9998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s, visibility 0.25s;
+  }
+  .hdash-sheet-mask.show { opacity: 1; visibility: visible; }
+  .hdash-sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    z-index: 9999;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 12px 16px 34px;
+  }
+  .hdash-sheet.show { transform: translateY(0); }
+  .hdash-sheet-handle {
+    width: 36px;
+    height: 4px;
+    background: var(--border-color);
+    border-radius: 2px;
+    margin: 0 auto 16px;
+  }
+  .hdash-sheet-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .hdash-sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    min-height: 48px;
+  }
+  .hdash-sheet-item:active { background: #f3f4f8; }
+  .hdash-sheet-item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .hdash-sheet-item-label {
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+  .hdash-sheet-cancel {
+    margin-top: 12px;
+    text-align: center;
+    padding: 14px;
+    font-size: 15px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hdash-sheet-cancel:active { background: #f3f4f8; }
+
+  /* ===== 响应式：≤480px 微调 ===== */
+  @media (max-width: 480px) {
+    .hdash-grid { gap: 10px; }
+    .hdash-card { padding: 14px 12px; }
+    .hdash-card-value { font-size: 24px; }
+    .hdash-insight-num .num { font-size: 32px; }
+  }
+</style>
+
+<div class="hdash-wrap" id="hdashWrap">
+
+  <!-- 1. 健康洞察卡 -->
+  <div class="hdash-insight">
+    <div class="hdash-insight-head">
+      <div class="hdash-insight-title">健康洞察</div>
+      <a href="javascript:;" class="hdash-insight-more" onclick="hdashScrollToVitals()">查看详情 ›</a>
+    </div>
+    <div class="hdash-insight-sub">基于您的健康记录自动生成</div>
+    <div class="hdash-insight-body">
+      <div class="hdash-insight-num">
+        <div>
+          <span class="num" id="hdashChangeCount">0</span>
+          <span class="unit">项</span>
+          <span class="label">健康记录</span>
+        </div>
+      </div>
+      <!-- 装饰性环形图标（蓝紫青渐变） -->
+      <svg class="hdash-insight-icon" viewBox="0 0 80 80" fill="none">
+        <defs>
+          <linearGradient id="hdashGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#3b82f6"/>
+            <stop offset="50%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+        </defs>
+        <circle cx="40" cy="40" r="32" stroke="url(#hdashGrad1)" stroke-width="2" opacity="0.3"/>
+        <circle cx="40" cy="40" r="24" stroke="url(#hdashGrad1)" stroke-width="2" opacity="0.5"/>
+        <circle cx="40" cy="40" r="16" stroke="url(#hdashGrad1)" stroke-width="2.5" opacity="0.8"/>
+        <circle cx="40" cy="24" r="4" fill="url(#hdashGrad1)"/>
+        <circle cx="28" cy="50" r="4" fill="url(#hdashGrad1)"/>
+        <circle cx="52" cy="50" r="4" fill="url(#hdashGrad1)"/>
+      </svg>
+    </div>
+    <div class="hdash-insight-list" id="hdashInsightList">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- 2. 2列指标卡网格 -->
+  <div class="hdash-grid">
+
+    <!-- 体重管理 -->
+    <div class="hdash-card" id="hdashCardWeight">
+      <div class="hdash-card-title">体重管理</div>
+      <div id="hdashWeightContent"></div>
+    </div>
+
+    <!-- 血压 -->
+    <div class="hdash-card hdash-card-bp" id="hdashCardBP">
+      <div class="hdash-card-title">血压</div>
+      <div id="hdashBPContent"></div>
+      <!-- 红色水滴装饰 -->
+      <svg class="hdash-bp-deco" viewBox="0 0 60 60" fill="none">
+        <defs>
+          <linearGradient id="hdashBpGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#bfdbfe"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
+          </linearGradient>
+        </defs>
+        <path d="M30 8 C30 8, 14 28, 14 40 A16 16 0 0 0 46 40 C46 28, 30 8, 30 8 Z" fill="url(#hdashBpGrad)" opacity="0.85"/>
+        <ellipse cx="25" cy="36" rx="4" ry="6" fill="#fff" opacity="0.3"/>
+      </svg>
+    </div>
+
+  </div>
+
+  <!-- 3. 快捷功能行 -->
+  <div class="hdash-quick" onclick="hdashOpenSheet()">
+    <div class="hdash-quick-icons">
+      <div class="hdash-quick-icon hdash-quick-icon-weight"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M6 21h12"/><path d="M3 7h18"/><path d="m4 10 3 3 3-3"/><path d="m14 10 3 3 3-3"/></svg></div>
+      <div class="hdash-quick-icon hdash-quick-icon-bp"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+      <div class="hdash-quick-icon hdash-quick-icon-med"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></div>
+      <div class="hdash-quick-icon hdash-quick-icon-checkup"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg></div>
+    </div>
+    <div class="hdash-quick-text">添加您喜爱的快捷功能</div>
+    <div class="hdash-quick-plus">+</div>
+  </div>
+
+</div>
+
+<!-- 快捷功能 Action Sheet -->
+<div class="hdash-sheet-mask" id="hdashSheetMask" onclick="hdashCloseSheet()"></div>
+<div class="hdash-sheet" id="hdashSheet">
+  <div class="hdash-sheet-handle"></div>
+  <div class="hdash-sheet-title">快速添加健康记录</div>
+  <div class="hdash-sheet-item" onclick="hdashQuickAdd('weight')">
+    <div class="hdash-sheet-item-icon hdash-quick-icon-weight"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M6 21h12"/><path d="M3 7h18"/><path d="m4 10 3 3 3-3"/><path d="m14 10 3 3 3-3"/></svg></div>
+    <div class="hdash-sheet-item-label">记录体重</div>
+  </div>
+  <div class="hdash-sheet-item" onclick="hdashQuickAdd('bp')">
+    <div class="hdash-sheet-item-icon hdash-quick-icon-bp"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+    <div class="hdash-sheet-item-label">记录血压</div>
+  </div>
+  <div class="hdash-sheet-item" onclick="hdashQuickAdd('med')">
+    <div class="hdash-sheet-item-icon hdash-quick-icon-med"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></div>
+    <div class="hdash-sheet-item-label">添加用药提醒</div>
+  </div>
+  <div class="hdash-sheet-item" onclick="hdashQuickAdd('checkup')">
+    <div class="hdash-sheet-item-icon hdash-quick-icon-checkup"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></svg></div>
+    <div class="hdash-sheet-item-label">添加复诊计划</div>
+  </div>
+  <div class="hdash-sheet-cancel" onclick="hdashCloseSheet()">取消</div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ===== 数据读取（复用现有 health.html 数据） =====
+   * 优先级：全局变量 > localStorage
+   * 兼容多种可能的字段命名
+   */
+  function readVitals() {
+    // 尝试从全局变量读取
+    if (typeof vitals !== 'undefined' && Array.isArray(vitals)) return vitals;
+    if (typeof healthVitals !== 'undefined' && Array.isArray(healthVitals)) return healthVitals;
+    if (typeof state !== 'undefined' && state.vitals && Array.isArray(state.vitals)) return state.vitals;
+    // 尝试 localStorage
+    try {
+      var raw = localStorage.getItem('health_vitals') || localStorage.getItem('vitals');
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return [];
+  }
+
+  function readMeds() {
+    if (typeof meds !== 'undefined' && Array.isArray(meds)) return meds;
+    if (typeof medList !== 'undefined' && Array.isArray(medList)) return medList;
+    if (typeof healthMeds !== 'undefined' && Array.isArray(healthMeds)) return healthMeds;
+    if (typeof state !== 'undefined' && state.med && Array.isArray(state.med)) return state.med;
+    try {
+      var raw = localStorage.getItem('health_meds') || localStorage.getItem('meds') || localStorage.getItem('med');
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return [];
+  }
+
+  function readCheckups() {
+    if (typeof checkups !== 'undefined' && Array.isArray(checkups)) return checkups;
+    if (typeof checkupList !== 'undefined' && Array.isArray(checkupList)) return checkupList;
+    if (typeof healthCheckups !== 'undefined' && Array.isArray(healthCheckups)) return healthCheckups;
+    if (typeof state !== 'undefined' && state.checkup && Array.isArray(state.checkup)) return state.checkup;
+    try {
+      var raw = localStorage.getItem('health_checkups') || localStorage.getItem('checkups') || localStorage.getItem('checkup');
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return [];
+  }
+
+  /* ===== 工具函数 ===== */
+  function getLatestVital(vitals, field) {
+    if (!vitals || vitals.length === 0) return null;
+    // 按日期排序取最新
+    var sorted = vitals.slice().sort(function(a, b) {
+      var da = new Date(a.date || a.recordDate || a.createdAt || 0);
+      var db = new Date(b.date || b.recordDate || b.createdAt || 0);
+      return db - da;
+    });
+    // 回退查找：取“该字段最近一次有值”的记录（避免一条只记体重的新记录把血压“挤没”）
+    for (var i = 0; i < sorted.length; i++) {
+      var v = sorted[i][field];
+      if (v !== undefined && v !== null && v !== '') return v;
+    }
+    return null;
+  }
+
+  function getVitalDate(vitals) {
+    if (!vitals || vitals.length === 0) return null;
+    var sorted = vitals.slice().sort(function(a, b) {
+      var da = new Date(a.date || a.recordDate || a.createdAt || 0);
+      var db = new Date(b.date || b.recordDate || b.createdAt || 0);
+      return db - da;
+    });
+    return sorted[0].date || sorted[0].recordDate || sorted[0].createdAt || null;
+  }
+
+  function calcBMI(weightKg, heightCm) {
+    if (!weightKg || !heightCm) return null;
+    var m = heightCm / 100;
+    return weightKg / (m * m);
+  }
+
+  function bmiCategory(bmi) {
+    if (bmi === null || isNaN(bmi)) return { label: '未知', color: '#9ca3af', angle: 50 };
+    if (bmi < 18.5) return { label: '偏瘦', color: '#3b82f6', angle: 15 };
+    if (bmi < 24) return { label: '正常', color: '#10b981', angle: 50 };
+    if (bmi < 28) return { label: '超重', color: '#f59e0b', angle: 80 };
+    return { label: '肥胖', color: '#ef4444', angle: 95 };
+  }
+
+  /* ===== 渲染：健康洞察卡 ===== */
+  function renderInsight() {
+    var vitals = readVitals();
+    var meds = readMeds();
+    var checkups = readCheckups();
+
+    // 口径与「健康记录」一致：慢性/过敏/用药/复诊/体征 全部计入
+    var chronic = (typeof window.chronic !== 'undefined' && Array.isArray(window.chronic)) ? window.chronic : [];
+    var allergies = (typeof window.allergies !== 'undefined' && Array.isArray(window.allergies)) ? window.allergies : [];
+    var changeCount = vitals.length + meds.length + checkups.length + chronic.length + allergies.length;
+    document.getElementById('hdashChangeCount').textContent = changeCount;
+
+    var listEl = document.getElementById('hdashInsightList');
+    var insights = [];
+
+    // 洞察1：血压稳定性（最近30天）
+    if (vitals.length >= 2) {
+      var now = new Date();
+      var thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+      var recentVitals = vitals.filter(function(v) {
+        var d = new Date(v.date || v.recordDate || v.createdAt);
+        return d >= thirtyDaysAgo;
+      });
+      if (recentVitals.length >= 2) {
+        var sysValues = recentVitals.map(function(v) { return v.systolic || v.sys; }).filter(function(v) { return v != null; });
+        if (sysValues.length >= 2) {
+          var avg = sysValues.reduce(function(a,b){return a+b;},0) / sysValues.length;
+          var variance = Math.max.apply(null, sysValues) - Math.min.apply(null, sysValues);
+          if (variance <= 10) {
+            insights.push({
+              icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>', bg: 'rgba(59,130,246,.12)', color: '#1d4ed8',
+              text: '静息血压最近 30 天稳定',
+              pill: '稳定', pillClass: 'hdash-pill-gray'
+            });
+          } else if (avg > 130) {
+            insights.push({
+              icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>', bg: 'rgba(59,130,246,.12)', color: '#1d4ed8',
+              text: '血压偏高，建议持续监测',
+              pill: '偏高', pillClass: 'hdash-pill-red'
+            });
+          }
+        }
+      }
+    }
+
+    // 洞察2：体重变化（较上月）
+    if (vitals.length >= 2) {
+      var sorted = vitals.slice().sort(function(a,b) {
+        var da = new Date(a.date || a.recordDate || 0);
+        var db = new Date(b.date || b.recordDate || 0);
+        return da - db;
+      });
+      var latest = sorted[sorted.length - 1];
+      var latestWeight = latest.weight || latest.bodyWeight;
+      // 找大约一个月前的记录
+      var oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      var oldRecord = null;
+      for (var i = sorted.length - 1; i >= 0; i--) {
+        var d = new Date(sorted[i].date || sorted[i].recordDate || 0);
+        if (d <= oneMonthAgo) { oldRecord = sorted[i]; break; }
+      }
+      if (oldRecord && latestWeight) {
+        var oldWeight = oldRecord.weight || oldRecord.bodyWeight;
+        if (oldWeight) {
+          var diff = (latestWeight - oldWeight).toFixed(1);
+          var direction = diff > 0 ? '上升' : (diff < 0 ? '下降' : '持平');
+          var iconBg = diff > 0 ? '#fef3c7' : '#dbeafe';
+          var iconColor = diff > 0 ? '#f59e0b' : '#3b82f6';
+          insights.push({
+            icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M6 21h12"/><path d="M3 7h18"/><path d="m4 10 3 3 3-3"/><path d="m14 10 3 3 3-3"/></svg>', bg: iconBg, color: iconColor,
+            text: '体重较上月变化 ' + (diff > 0 ? '+' : '') + diff + 'kg',
+            pill: direction, pillClass: diff > 0 ? 'hdash-pill-blue' : (diff < 0 ? 'hdash-pill-green' : 'hdash-pill-gray')
+          });
+        }
+      }
+    }
+
+    // 洞察3：用药提醒
+    if (meds.length > 0) {
+      var todayStr = new Date().toISOString().slice(0,10);
+      var todayMeds = meds.filter(function(m) {
+        return m.nextDate === todayStr || m.next_date === todayStr;
+      });
+      if (todayMeds.length > 0) {
+        insights.push({
+          icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>', bg: '#f3e8ff', color: '#3b82f6',
+          text: '今日有 ' + todayMeds.length + ' 种药物需要服用',
+          pill: '提醒', pillClass: 'hdash-pill-blue'
+        });
+      }
+    }
+
+    // 渲染
+    if (insights.length === 0) {
+      // UI-51 修复：空态不再与上方记录数矛盾——已有记录时说「再记几个日期就能生成趋势」
+      var n = changeCount || 0;
+      listEl.innerHTML = '<div class="hdash-insight-empty">'
+        + (n > 0
+          ? '已记录 ' + n + ' 条健康数据<br>再记录几个不同日期的血压/体重，就能生成趋势洞察'
+          : '暂无足够数据生成洞察<br>开始记录血压/体重后自动生成')
+        + '</div>';
+    } else {
+      listEl.innerHTML = insights.slice(0, 3).map(function(item) {
+        return '<div class="hdash-insight-item">' +
+          '<div class="hdash-insight-dot" style="background:' + item.bg + ';color:' + item.color + '">' + item.icon + '</div>' +
+          '<div class="hdash-insight-text">' + item.text + '</div>' +
+          '<span class="hdash-insight-pill ' + item.pillClass + '">' + item.pill + '</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  /* ===== 渲染：体重管理卡 ===== */
+  function renderWeightCard() {
+    var vitals = readVitals();
+    var el = document.getElementById('hdashWeightContent');
+    var weight = getLatestVital(vitals, 'weight') || getLatestVital(vitals, 'bodyWeight');
+
+    if (!weight) {
+      el.innerHTML =
+        '<div class="hdash-empty">' +
+          '<div class="hdash-empty-text">暂无体重记录</div>' +
+          '<button class="hdash-empty-add" onclick="hdashScrollToVitals()">+ 添加</button>' +
+        '</div>';
+      return;
+    }
+
+    // 尝试获取身高算 BMI
+    var height = null;
+    if (typeof userHeight !== 'undefined') height = userHeight;
+    else if (typeof state !== 'undefined' && state.height) height = state.height;
+    else {
+      try { height = localStorage.getItem('health_height'); } catch(e) {}
+    }
+
+    var bmi = calcBMI(parseFloat(weight), height ? parseFloat(height) : null);
+    var bmiInfo = bmi ? bmiCategory(bmi) : null;
+
+    var html = '<div class="hdash-card-value">' + parseFloat(weight).toFixed(1) + '<span class="hdash-card-unit"> kg</span></div>';
+
+    // BMI 迷你仪表盘
+    if (bmiInfo) {
+      html += renderBmiGauge(bmiInfo.angle, bmiInfo.color);
+      html += '<div class="hdash-card-sub">BMI ' + bmi.toFixed(1) + '，' + bmiInfo.label + '</div>';
+    } else {
+      html += '<div class="hdash-card-sub">记录身高后可计算 BMI</div>';
+    }
+
+    el.innerHTML = html;
+  }
+
+  function renderBmiGauge(angle, color) {
+    // 半圆弧仪表盘 SVG
+    // 弧从 -180deg 到 0deg（上半圆）
+    var cx = 50, cy = 45, r = 38;
+    // 背景弧（红→黄→绿渐变）
+    // 刻度点
+    var ticks = '';
+    for (var i = 0; i <= 10; i++) {
+      var a = Math.PI - (i / 10) * Math.PI;
+      var x1 = cx + (r - 8) * Math.cos(a);
+      var y1 = cy - (r - 8) * Math.sin(a);
+      var x2 = cx + (r - 4) * Math.cos(a);
+      var y2 = cy - (r - 4) * Math.sin(a);
+      ticks += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#e5e7eb" stroke-width="1.5"/>';
+    }
+    // 指针
+    var pointerAngle = Math.PI - (angle / 100) * Math.PI;
+    var px = cx + (r - 10) * Math.cos(pointerAngle);
+    var py = cy - (r - 10) * Math.sin(pointerAngle);
+
+    return '<svg class="hdash-bmi-gauge" viewBox="0 0 100 52">' +
+      '<defs>' +
+        '<linearGradient id="bmiGrad" x1="0%" y1="0%" x2="100%" y2="0%">' +
+          '<stop offset="0%" stop-color="#ef4444"/>' +
+          '<stop offset="50%" stop-color="#f59e0b"/>' +
+          '<stop offset="100%" stop-color="#10b981"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      '<path d="M ' + (cx - r) + ' ' + cy + ' A ' + r + ' ' + r + ' 0 0 1 ' + (cx + r) + ' ' + cy + '" ' +
+        'fill="none" stroke="url(#bmiGrad)" stroke-width="6" stroke-linecap="round" opacity="0.3"/>' +
+      ticks +
+      '<circle cx="' + px + '" cy="' + py + '" r="4" fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="3" fill="#9ca3af"/>' +
+    '</svg>';
+  }
+
+  /* ===== 渲染：血压卡 ===== */
+  function renderBPCard() {
+    var vitals = readVitals();
+    var el = document.getElementById('hdashBPContent');
+    var sys = getLatestVital(vitals, 'systolic') || getLatestVital(vitals, 'sys');
+    var dia = getLatestVital(vitals, 'diastolic') || getLatestVital(vitals, 'dia');
+
+    if (!sys || !dia) {
+      el.innerHTML =
+        '<div class="hdash-empty">' +
+          '<div class="hdash-empty-text">暂无血压记录</div>' +
+          '<button class="hdash-empty-add" onclick="hdashScrollToVitals()">+ 添加</button>' +
+        '</div>';
+      return;
+    }
+
+    el.innerHTML =
+      '<div class="hdash-card-value">' + sys + '/' + dia + '<span class="hdash-card-unit"> mmHg</span></div>' +
+      '<a href="javascript:;" class="hdash-card-link" onclick="hdashScrollToVitals()">查看详情 ›</a>';
+  }
+
+  /* ===== Action Sheet ===== */
+  window.hdashOpenSheet = function() {
+    document.getElementById('hdashSheetMask').classList.add('show');
+    document.getElementById('hdashSheet').classList.add('show');
+  };
+  window.hdashCloseSheet = function() {
+    document.getElementById('hdashSheetMask').classList.remove('show');
+    document.getElementById('hdashSheet').classList.remove('show');
+  };
+  window.hdashQuickAdd = function(type) {
+    hdashCloseSheet();
+    if (type === 'weight' || type === 'bp') hdashScrollToVitals();
+    else if (type === 'med') hdashScrollToMeds();
+    else if (type === 'checkup') hdashScrollToCheckups();
+  };
+
+  /* ===== 滚动定位（复用现有表单区） ===== */
+  function scrollToSelector(selectors, textKeywords, cb) {
+    var i, el;
+    for (i = 0; i < selectors.length; i++) {
+      el = document.querySelector(selectors[i]);
+      if (el) break;
+    }
+    if (!el) {
+      var cards = document.querySelectorAll('.h-card, .card, [class*="card"]');
+      for (i = 0; i < cards.length; i++) {
+        for (var k = 0; k < textKeywords.length; k++) {
+          if (cards[i].textContent.indexOf(textKeywords[k]) >= 0) { el = cards[i]; break; }
+        }
+        if (el) break;
+      }
+    }
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.style.transition = 'box-shadow .3s';
+      el.style.boxShadow = '0 0 0 3px var(--primary, #3b82f6)';
+      setTimeout(function(){ el.style.boxShadow = ''; }, 1600);
+    }
+    if (typeof cb === 'function') setTimeout(cb, 500);
+  }
+  window.hdashScrollToVitals = function() {
+    scrollToSelector(
+      ['#cardVitals', '#vitalsCard', '#vitalsForm', '.vitals-section', '.h-card'],
+      ['体征', '血压'],
+      function() {
+        var w = document.getElementById('vWeight');
+        if (w) w.focus();
+      }
+    );
+  };
+  window.hdashScrollToMeds = function() {
+    scrollToSelector(
+      ['#cardMed', '#medCard', '#medForm', '.med-section'],
+      ['用药', '常用药'],
+      function() { if (typeof window.addRow === 'function') window.addRow('med'); }
+    );
+  };
+  window.hdashScrollToCheckups = function() {
+    scrollToSelector(
+      ['#cardCheckup', '#checkupCard', '#checkupForm', '.checkup-section'],
+      ['复诊'],
+      function() { if (typeof window.addRow === 'function') window.addRow('checkup'); }
+    );
+  };
+
+  /* ===== 初始化渲染 ===== */
+  function renderAll() {
+    renderInsight();
+    renderWeightCard();
+    renderBPCard();
+  }
+
+  // DOM ready 后渲染
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderAll);
+  } else {
+    renderAll();
+  }
+
+  // 暴露刷新接口（供现有保存逻辑调用后刷新仪表盘）
+  window.hdashRefresh = renderAll;
+
+})();
+</script>
+<!-- ============================================================
+  健康总览仪表盘 END
+  ============================================================ -->
+
+
+        <!-- 家人选择 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="m8 11 2 2 4-4"/><path d="m16 13 2 2 4-4"/></svg> 选择家人</span>
+            </div>
+            <div id="memberTabs"></div>
+        </div>
+
+        <!-- 档案概览 + 保存 + 备注 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title" id="profileTitle">健康记录</span>
+                <span class="spacer"></span>
+                <button class="btn btn-primary btn-xs" onclick="saveProfile()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 保存档案</button>
+            </div>
+            <div class="form-group">
+                <label>健康备注</label>
+                <textarea id="pNotes" rows="3" placeholder="血型、手术史、注意事项等" aria-label="健康备注"></textarea>
+            </div>
+        </div>
+
+        <!-- 慢性病 / 长期问题 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg> 慢性病 / 长期问题</span>
+            </div>
+            <div id="chronicRows"></div><div class="h-empty">还没有慢性病记录，点下方「添加慢性病」开始维护</div>
+            <button class="h-addbtn" onclick="addRow('chronic')">＋ 添加慢性病</button>
+        </div>
+
+        <!-- 过敏史 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg> 过敏史</span>
+            </div>
+            <div id="allergyRows"></div><div class="h-empty">还没有过敏史记录，点下方「添加过敏原」登记</div>
+            <button class="h-addbtn" onclick="addRow('allergy')">＋ 添加过敏原</button>
+        </div>
+
+        <!-- 常用药 / 用药提醒 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg> 常用药 / 用药提醒</span>
+            </div>
+            <div id="medRows"></div><div class="h-empty">还没有常用药记录，点下方「添加用药」登记</div>
+            <button class="h-addbtn" onclick="addRow('med')">＋ 添加用药</button>
+        </div>
+
+        <!-- 复诊计划 -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> 复诊计划</span>
+                <span class="spacer"></span>
+                <span class="h-hint">进入统一到期提醒</span>
+            </div>
+            <div id="checkupRows"></div><div class="h-empty">还没有复诊计划，点下方「添加复诊计划」安排提醒</div>
+            <button class="h-addbtn" onclick="addRow('checkup')">＋ 添加复诊计划</button>
+        </div>
+
+        <!-- 体征记录：血压 / 体重 + 月度趋势（P4-04） -->
+        <div class="card h-card">
+            <div class="h-card-head">
+                <span class="h-bar"></span>
+                <span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> 体征记录（血压 / 体重）</span>
+                <span class="spacer"></span>
+                <span class="status-tag" style="background:var(--primary-light);color:var(--primary);" id="vitalsCount">0 条</span>
+            </div>
+            <div class="form-inline" style="gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                <input type="date" id="vDate" value="" style="flex:1;min-width:100px;" aria-label="体征记录日期">
+                <input type="number" id="vSys" inputmode="numeric" placeholder="收缩压 mmHg" style="flex:1;min-width:76px;" aria-label="收缩压 mmHg">
+                <input type="number" id="vDia" inputmode="numeric" placeholder="舒张压 mmHg" style="flex:1;min-width:76px;" aria-label="舒张压 mmHg">
+                <input type="number" id="vWeight" inputmode="decimal" step="0.1" placeholder="体重 kg" style="flex:1;min-width:76px;" aria-label="体重 kg">
+                <input type="text" id="vCustomName" placeholder="自定义指标名(如:血糖)" style="flex:1;min-width:88px;" aria-label="自定义指标名" maxlength="20">
+                <input type="text" id="vCustomValue" placeholder="数值(如:5.2)" style="flex:0.8;min-width:70px;" aria-label="自定义指标数值" maxlength="30">
+                <input type="text" id="vNote" placeholder="备注(选填)" style="flex:1.3;min-width:88px;" aria-label="体征备注">
+                <button class="btn btn-primary btn-xs" onclick="addVital()">记一笔</button>
+            </div>
+            <div id="vitalsList"></div>
+            <div class="section-title" style="margin:18px 0 8px;">月度趋势（近 6 个月均值）</div>
+            <div id="vitalsTrend"></div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('health', '健康记录');
+        function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+        let members = [], currentMemberId = null, profile = null;
+        /* ---- FIX-2：家人头像 emoji 渲染层替换为 Lucide 蓝色 SVG（参照 family.html） ---- */
+        const MEMBER_DEFAULT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
+        const MEMBER_ICON_MAP = {
+            '\u{1F469}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F468}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F467}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F466}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F476}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
+            '\u{1F43E}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>'
+        };
+        const MEMBER_USERS_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+        function renderMemberIcon(e) {
+            if (!e) return MEMBER_DEFAULT_ICON;
+            if (e.indexOf('<svg') === 0) return e;
+            const key = e.replace(/\uFE0F/g, '');
+            if (key.indexOf('\u200d') >= 0) return MEMBER_USERS_ICON;
+            return MEMBER_ICON_MAP[key] || MEMBER_DEFAULT_ICON;
+        }
+        /* P3：家人头像统一为「成员固定色 + 名字首字」圆形头像（零数据结构改动） */
+        const AVATAR_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
+        function avatarColor(seed) { let h = 0; const s = String(seed || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+        function renderMemberAvatar(m) {
+            // 命中卡通头像图则显示 <img>，否则回退「固定色+首字」圆形
+            if (window.memberAvatarHtml) {
+                const h = window.memberAvatarHtml(m);
+                if (h) return h;
+            }
+            const name = String((m && m.name) || '?').replace(/\s/g, '');
+            const ch = name.charAt(0) || '?';
+            const col = avatarColor(m && m.id != null ? m.id : name);
+            return '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:' + col + ';color:#fff;font-size:12px;font-weight:600;flex:none;">' + escapeHtml(ch) + '</span>';
+        }
+        const DUE_CN = { overdue: '已过期', due: '今天', soon: '临近', ok: '正常' };
+        const DUE_COLOR = { overdue: 'var(--danger)', due: 'var(--danger)', soon: '#3b82f6', ok: 'var(--text-secondary)' };
+
+        async function loadAll() {
+            const [mRes, rRes] = await Promise.all([apiGet('/api/family'), apiGet('/api/health/reminders')]);
+            members = mRes.data || [];
+            renderMemberTabs();
+            renderReminders(rRes.data || []);
+            if (!currentMemberId && members.length) selectMember(members[0].id);
+            else if (currentMemberId) loadProfile(currentMemberId);
+        }
+
+        function renderMemberTabs() {
+            const box = document.getElementById('memberTabs');
+            if (!members.length) { box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">还没有家庭成员，先到「家庭成员」添加成员。</div>'; return; }
+            box.innerHTML = members.map(m => `<button type="button" class="btn ${m.id === currentMemberId ? 'btn-primary' : 'btn-secondary'} btn-xs" onclick="selectMember(${m.id})">${renderMemberAvatar(m)} ${escapeHtml(m.name)}</button>`).join('');
+        }
+
+        function renderReminders(list) {
+            const box = document.getElementById('reminderList');
+            const soon = list.filter(x => x.state !== 'ok');
+            document.getElementById('reminderCount').textContent = soon.length + ' 项待处理';
+            if (!soon.length) { box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">' + (list.length ? '暂无待处理的复诊 / 用药提醒。' : '暂无复诊 / 用药提醒。') + '</div>'; return; }
+            box.innerHTML = soon.slice(0, 6).map(x => {
+                const isMed = x.type === '用药';
+                const icon = isMed ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>';
+                const kindLabel = isMed ? '用药提醒' : '复诊';
+                return `
+                <div class="expiry-row" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#eee);">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;">${icon} ${escapeHtml(x.title)} <span style="color:var(--text-secondary);font-weight:400;">· ${escapeHtml(x.member)}</span></div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${x.date} ${kindLabel}${isMed ? ' · ' + (x.freq || '') : ''}</div>
+                    </div>
+                    <span class="status-tag" style="background:${DUE_COLOR[x.state]};color:#fff;">${DUE_CN[x.state] || x.state}${x.daysLeft > 0 ? ' · ' + x.daysLeft + '天' : ''}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function selectMember(id) { currentMemberId = id; renderMemberTabs(); loadProfile(id); }
+
+        async function loadProfile(id) {
+            const r = await apiGet('/api/health/' + id);
+            if (r.code !== 200) return;
+            profile = r.data;
+            const mObj = members.find(x => x.id === id) || {};
+            const memberName = profile.memberName || mObj.name || '未命名';
+            document.getElementById('profileTitle').innerHTML = renderMemberAvatar({ id: id, name: memberName, avatar: mObj.avatar }) + ' ' + escapeHtml(memberName) + ' · 健康记录';
+            document.getElementById('pNotes').value = profile.notes || '';
+            const c = profile.chronic || [], a = profile.allergies || [], m = profile.medications || [], ck = profile.checkups || [], v = profile.vitals || [];
+            document.getElementById('chronicRows').innerHTML = chronicChipsHtml(c) + '<input class="h-chip-input" data-type="chronic" placeholder="+ 输入病名后回车" onkeydown="chipEnter(event,\'chronic\')" aria-label="添加慢性病">';
+            document.getElementById('allergyRows').innerHTML = allergyChipsHtml(a) + '<input class="h-chip-input" data-type="allergy" placeholder="+ 输入过敏原后回车" onkeydown="chipEnter(event,\'allergy\')" aria-label="添加过敏原">';
+            document.getElementById('medRows').innerHTML = m.length ? m.map((x, i) => medRow(i, x)).join('') : '';
+            document.getElementById('checkupRows').innerHTML = ck.length ? ck.map((x, i) => checkupRow(i, x)).join('') : '';
+            renderVitals(v);
+            renderVitalsTrend(v);
+            // 顶部 4 张快捷卡（体重/血压/用药/复诊）绑定当前选中家人实时数据，切换家人时同步刷新
+            window.vitals = v || [];
+            window.meds = m || [];
+            window.checkups = ck || [];
+            window.chronic = c || [];
+            window.allergies = a || [];
+            if (typeof window.hdashRefresh === 'function') window.hdashRefresh();
+            const vd = document.getElementById('vDate');
+            if (vd && !vd.value) vd.value = todayStr();
+        }
+
+        function chronicRow(i, x) { return `<div class="h-row"><input class="cName" value="${escapeHtml(x.name)}" placeholder="病名" aria-label="慢性病名称"><input class="cNote" value="${escapeHtml(x.note || '')}" placeholder="备注(选填)" aria-label="慢性病备注"><button class="h-del" title="删除" aria-label="删除" onclick="removeHRow(this,'chronic')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`; }
+        function allergyRow(i, x) { return `<div class="h-row"><input class="aName" value="${escapeHtml(x)}" placeholder="过敏原" aria-label="过敏原"><button class="h-del" title="删除" aria-label="删除" onclick="removeHRow(this,'allergy')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`; }
+
+        /* chips 风格：慢性病/过敏史已保存项显示为标签 */
+        function chronicChipsHtml(list) {
+            if (!list || !list.length) return '';
+            return list.map((x, i) => '<span class="chip-tag" data-idx="' + i + '" data-type="chronic">'
+                + escapeHtml(x.name) + (x.note ? ' <small style="opacity:.6;font-weight:400;">' + escapeHtml(x.note) + '</small>' : '')
+                + ' <span class="chip-x" onclick="removeChip(this)" aria-label="删除">×</span></span>').join('');
+        }
+        function allergyChipsHtml(list) {
+            if (!list || !list.length) return '';
+            return list.map((x, i) => '<span class="chip-tag" data-idx="' + i + '" data-type="allergy">'
+                + escapeHtml(x)
+                + ' <span class="chip-x" onclick="removeChip(this)" aria-label="删除">×</span></span>').join('');
+        }
+        function removeChip(el) { el.parentElement.remove(); }
+        function chipEnter(e, type) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const v = e.target.value.trim();
+            if (!v) return;
+            const box = e.target.parentElement;
+            const tag = document.createElement('span');
+            tag.className = 'chip-tag';
+            tag.setAttribute('data-type', type);
+            tag.innerHTML = escapeHtml(v) + ' <span class="chip-x" onclick="removeChip(this)" aria-label="删除">×</span>';
+            box.insertBefore(tag, e.target);
+            e.target.value = '';
+        }
+        function medRow(i, x) { return `<div class="h-row" ${x.remind ? 'style="background:var(--primary-light);border-radius:10px;padding:6px 10px;"' : ''}><input class="mName" value="${escapeHtml(x.name)}" placeholder="药名" aria-label="药名"><input class="mDose" value="${escapeHtml(x.dose || '')}" placeholder="剂量" aria-label="剂量"><input class="mFreq" value="${escapeHtml(x.freq || '')}" placeholder="频率" aria-label="用药频率"><input type="date" class="mNextDate" value="${escapeHtml(x.nextDate || '')}" title="下次用药 / 补药日期（勾选提醒后按此日期进入到期提醒）" aria-label="下次用药日期"><label class="h-remind"><input type="checkbox" class="mRemind" ${x.remind ? 'checked' : ''} aria-label="开启用药提醒" onchange="var r=this.closest('.h-row');r.style.background=this.checked?'var(--primary-light)':'transparent';r.style.borderRadius=this.checked?'10px':'0';">提醒</label><button class="h-del" title="删除" aria-label="删除" onclick="removeHRow(this,'med')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`; }
+        function checkupRow(i, x) { return `<div class="h-row"><input class="kName" value="${escapeHtml(x.name)}" placeholder="项目(如:皮肤科复诊)" aria-label="复诊项目"><input type="date" class="kDate" value="${escapeHtml(x.nextDate || '')}" aria-label="复诊日期"><button class="h-del" title="删除" aria-label="删除" onclick="removeHRow(this,'checkup')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`; }
+
+        function addRow(type) {
+            const map = { chronic: 'chronicRows', allergy: 'allergyRows', med: 'medRows', checkup: 'checkupRows' };
+            const fn = { chronic: chronicRow, allergy: allergyRow, med: medRow, checkup: checkupRow }[type];
+            const box = document.getElementById(map[type]);
+            box.insertAdjacentHTML('beforeend', fn(Date.now(), type === 'allergy' ? '' : { name: '', note: '', dose: '', freq: '', remind: false, nextDate: '' }));
+        }
+
+        // FIX-33：档案表单行删除二次确认。这类行是「待保存草稿」——删除仅移除 DOM，点「保存档案」后才真正落库。
+        async function removeHRow(btn, kind) {
+            const row = btn.closest('.h-row');
+            if (!row) return;
+            const labelMap = { chronic: '慢性病', allergy: '过敏原', med: '用药', checkup: '复诊计划' };
+            const inp = row.querySelector('input.mName,input.cName,input.aName,input.kName');
+            const name = inp ? inp.value.trim() : '';
+            const msg = '确定删除这条' + (labelMap[kind] || '记录') + (name ? '「' + name + '」' : '') + '吗？保存档案后才会生效。';
+            const ok = await confirmDel(msg);
+            if (ok) row.remove();
+        }
+
+        async function saveProfile() {
+            if (!currentMemberId) { alert('请先选择家人'); return; }
+            const chronic = [...document.querySelectorAll('#chronicRows .chip-tag[data-type="chronic"]')].map(t => ({ name: t.childNodes[0].textContent.trim(), note: '' })).filter(x => x.name);
+            const allergies = [...document.querySelectorAll('#allergyRows .chip-tag[data-type="allergy"]')].map(t => t.childNodes[0].textContent.trim()).filter(Boolean);
+            const medications = [...document.querySelectorAll('#medRows .h-row')].map(r => ({ name: r.querySelector('.mName').value.trim(), dose: r.querySelector('.mDose').value.trim(), freq: r.querySelector('.mFreq').value.trim(), remind: r.querySelector('.mRemind').checked, nextDate: r.querySelector('.mNextDate').value })).filter(x => x.name);
+            const checkups = [...document.querySelectorAll('#checkupRows .h-row')].map(r => ({ name: r.querySelector('.kName').value.trim(), nextDate: r.querySelector('.kDate').value })).filter(x => x.name);
+            const notes = document.getElementById('pNotes').value.trim();
+            const r = await apiPut('/api/health/' + currentMemberId, { chronic, allergies, medications, checkups, notes });
+            if (r.code !== 200) { alert(r.message || '保存失败'); return; }
+            showToast('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 健康记录已保存');
+            loadAll();
+        }
+
+        /* ---- 体征记录（血压/体重/自定义指标） ---- */
+        function vitalsText(v) {
+            const bp = (v.systolic || v.diastolic) ? ((v.systolic || '--') + '/' + (v.diastolic || '--')) : '';
+            const wt = v.weight ? (v.weight + ' kg') : '';
+            const cs = (v.customs || []).map(c => c.name + ' ' + c.value).join(' · ');
+            return [bp, wt, cs].filter(Boolean).join(' · ');
+        }
+        function renderVitals(list) {
+            const box = document.getElementById('vitalsList');
+            document.getElementById('vitalsCount').textContent = list.length + ' 条';
+            if (!list.length) { box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">还没有体征记录，先在上方记一笔（血压或体重，可只填一项）。</div>'; return; }
+            box.innerHTML = list.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id - a.id).map(v => `
+                <div class="expiry-row" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#eee);">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg> ${escapeHtml(vitalsText(v))}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${escapeHtml(v.date)}${v.note ? ' · ' + escapeHtml(v.note) : ''}</div>
+                    </div>
+                    <button class="btn btn-danger btn-xs" onclick="delVital(${v.id})">删</button>
+                </div>`).join('');
+        }
+        function renderVitalsTrend(list) {
+            const box = document.getElementById('vitalsTrend');
+            const recs = (list || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+            if (!recs.length) { box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">记录满一个月后，这里会显示血压 / 体重的月度均值走势。</div>'; return; }
+            const months = [];
+            for (let i = 5; i >= 0; i--) { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); }
+            const groups = months.map(mk => {
+                const g = recs.filter(r => (r.date || '').slice(0, 7) === mk);
+                if (!g.length) return { mk, empty: true };
+                const avg = (f, dec) => { const v = g.map(r => f(r)).filter(n => n !== null && n !== undefined); return v.length ? (dec ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : Math.round(v.reduce((a, b) => a + b, 0) / v.length)) : null; };
+                return { mk, empty: false, sys: avg(r => r.systolic), dia: avg(r => r.diastolic), wt: avg(r => r.weight, true), n: g.length };
+            });
+            const bpW = v => Math.max(4, Math.min(100, Math.round((v || 0) / 180 * 100)));
+            const wtW = v => Math.max(4, Math.min(100, Math.round((v - 40) / (120 - 40) * 100)));
+            const rows = groups.filter(g => !g.empty);
+            if (!rows.length) { box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);">当前月份还没有均值数据，记录后会在这里出图。</div>'; return; }
+            box.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">血压均值（红=收缩压 / 蓝=舒张压）</div>'
+                + rows.map(g => `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+                        <span style="width:34px;flex-shrink:0;color:var(--text-secondary);">${+g.mk.slice(5)}月</span>
+                        <div style="flex:1;display:flex;gap:3px;align-items:center;">
+                            ${g.sys ? '<div style="height:12px;background:#e05a5a;border-radius:3px;width:' + bpW(g.sys) + '%" title="收缩压均值 ' + g.sys + '"></div>' : ''}
+                            ${g.dia ? '<div style="height:12px;background:#4a7fd0;border-radius:3px;width:' + bpW(g.dia) + '%" title="舒张压均值 ' + g.dia + '"></div>' : ''}
+                            ${(!g.sys && !g.dia) ? '<span style="color:var(--text-secondary);">本月未测血压</span>' : ''}
+                        </div>
+                        <span style="width:64px;text-align:right;flex-shrink:0;">${g.sys && g.dia ? g.sys + '/' + g.dia : ''}</span>
+                    </div>`).join('')
+                + '<div style="font-size:12px;color:var(--text-secondary);margin:12px 0 6px;">体重均值（kg）</div>'
+                + rows.map(g => `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;">
+                        <span style="width:34px;flex-shrink:0;color:var(--text-secondary);">${+g.mk.slice(5)}月</span>
+                        <div style="flex:1;"><div style="height:12px;background:var(--primary);border-radius:3px;width:${g.wt ? wtW(g.wt) : 4}%"></div></div>
+                        <span style="width:64px;text-align:right;flex-shrink:0;">${g.wt ? g.wt + ' kg' : '未测'}</span>
+                    </div>`).join('')
+                + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">' + rows.map(g => g.mk.slice(0, 4) + '-' + g.mk.slice(5) + ' 记录 ' + g.n + ' 次').join('；') + '</div>';
+        }
+        async function addVital() {
+            if (!currentMemberId) { showToast('请先选择家人', 'warning'); return; }
+            const date = document.getElementById('vDate').value || todayStr();
+            const sys = document.getElementById('vSys').value;
+            const dia = document.getElementById('vDia').value;
+            const wt = document.getElementById('vWeight').value;
+            const cName = document.getElementById('vCustomName').value.trim();
+            const cValue = document.getElementById('vCustomValue').value.trim();
+            const customs = (cName && cValue) ? [{ name: cName, value: cValue }] : [];
+            if (cName && !cValue) { showToast('自定义指标「' + cName + '」还缺数值', 'warning'); return; }
+            if (!cName && cValue) { showToast('自定义数值还缺指标名', 'warning'); return; }
+            const note = document.getElementById('vNote').value.trim();
+            if (!sys && !dia && !wt && !customs.length) { showToast('请至少填写血压、体重或自定义指标', 'warning'); return; }
+            const r = await apiPost('/api/health/vitals', { memberId: currentMemberId, date, systolic: sys, diastolic: dia, weight: wt, customs, note });
+            if (!r || r.code !== 200) { showToast((r && r.message) || '记录失败', 'error'); return; }
+            document.getElementById('vSys').value = ''; document.getElementById('vDia').value = ''; document.getElementById('vWeight').value = ''; document.getElementById('vCustomName').value = ''; document.getElementById('vCustomValue').value = ''; document.getElementById('vNote').value = '';
+            showToast('体征已记录 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>', 'success');
+            loadProfile(currentMemberId);
+        }
+        async function delVital(id) {
+            const okd = await confirmDel('删除这条体征记录？');
+            if (!okd) return;
+            const r = await apiDelete('/api/health/vitals/' + id + '?memberId=' + currentMemberId);
+            if (!r || r.code !== 200) { showToast((r && r.message) || '删除失败', 'error'); return; }
+            showToast('已删除');
+            loadProfile(currentMemberId);
+        }
+
+        loadAll();
+    </script>
+</body>
+</html>

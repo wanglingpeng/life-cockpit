@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭账本 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+    @media (max-width:640px){.data-table .hide-xs{display:none}}
+    /* ---- 迭代 1：净资产条 + 账户横滑卡 ---- */
+    .nw-bar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+    .nw-item{flex:1 1 130px;min-width:0;background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:10px 14px;}
+    .nw-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px;}
+    .nw-val{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .acc-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+    .acc-card{flex:0 0 auto;min-width:128px;text-align:left;background:var(--card-bg);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:10px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s;}
+    .acc-card:hover{border-color:var(--primary);}
+    .acc-card.active{border-color:var(--primary);box-shadow:0 0 0 2px rgba(76,175,80,.22);}
+    .ac-top{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);}
+    .ac-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ac-bal{display:block;font-size:17px;font-weight:700;margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+    .ac-delta{display:block;font-size:12px;color:var(--text-secondary);}
+    /* ---- 记一笔：支出 / 收入 / 转账 三 Tab ---- */
+    .seg-tabs{display:flex;gap:6px;background:var(--bg-inset);border-radius:10px;padding:4px;margin-bottom:14px;}
+    .seg-tab{flex:1;border:0;background:transparent;border-radius:8px;padding:0;min-height:var(--btn-h-sm);font-size:14px;font-family:inherit;color:var(--text-secondary);cursor:pointer;}
+    .seg-tab.active{background:var(--card-bg);color:var(--text-primary);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.10);}
+    .tr-arrow{font-size:16px;color:var(--text-secondary);align-self:center;padding-bottom:2px;}
+    /* ---- 迭代 2：场景账本切换条 ---- */
+    .book-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin-bottom:4px;-webkit-overflow-scrolling:touch;}
+    .book-tab{flex:0 0 auto;display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--card-bg);border:1px solid var(--border-color);border-radius:999px;padding:7px 14px;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s;}
+    .book-tab:hover{border-color:var(--primary);}
+    .book-tab.active{border-color:var(--primary);box-shadow:0 0 0 2px rgba(var(--primary-rgb),.18);}
+    .bt-name{font-size:13px;font-weight:600;white-space:nowrap;}
+    .bt-sub{font-size:12px;color:var(--text-secondary);white-space:nowrap;}
+    /* FIX：账本切换按钮图标统一蓝色（浅色/深色均生效，未选中也是蓝色系） */
+    .book-tab .bt-name svg{color:var(--primary);}
+    /* ---- 迭代 2：二级分类宫格 ---- */
+    .cat-picker{margin-top:2px;}
+    .cp-selected{font-size:12px;color:var(--text-secondary);margin-bottom:6px;}
+    .cp-selected b{color:var(--primary);font-weight:600;}
+    .cp-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+    .cp-chip{border:1px solid var(--border-color);background:var(--card-bg);color:var(--text-primary);border-radius:8px;padding:0 10px;min-height:var(--btn-h-sm);font-size:13px;font-family:inherit;cursor:pointer;transition:border-color .12s,background .12s;}
+    .cp-chip:hover{border-color:var(--primary);}
+    .cp-chip.on{border-color:var(--primary);background:rgba(76,175,80,.12);font-weight:600;}
+    .cp-chip.child{font-size:12px;min-height:var(--btn-h-xs);padding:0 9px;background:var(--bg-inset);}
+    .cp-chip.child.on{background:rgba(76,175,80,.18);}
+    .cp-label{font-size:12px;color:var(--text-secondary);align-self:center;margin-right:2px;}
+    .cp-kids{border-top:1px dashed var(--border-color);padding-top:8px;}
+    /* ---- 迭代 2：支出构成可下钻到二级 ---- */
+    .cat-kids{margin:2px 0 6px 18px;display:flex;flex-direction:column;gap:3px;}
+    .cat-kid{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);}
+    .cat-kid .ck-name{flex:0 0 78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .cat-kid .ck-bar{flex:1;height:5px;border-radius:3px;background:var(--bg-inset);overflow:hidden;}
+    .cat-kid .ck-bar i{display:block;height:100%;background:var(--primary);opacity:.55;}
+    .cat-kid .ck-val{flex:0 0 auto;font-variant-numeric:tabular-nums;}
+    .cat-row.has-kids{cursor:pointer;}
+    .cat-row .cr-caret{font-size:12px;color:var(--text-secondary);margin-left:4px;}
+    /* ---- 迭代 3：本月预算 ---- */
+    .bg-total{background:var(--bg-inset);border-radius:var(--radius-lg);padding:10px 12px;margin-bottom:12px;}
+    .bg-row{padding:2px 0;}
+    .bg-top{display:flex;align-items:center;gap:8px;font-size:13px;min-height:24px;}
+    .bg-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .bg-num{margin-left:auto;flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--text-secondary);font-size:12px;}
+    .bg-num b{color:var(--text-primary);font-size:13px;}
+    .bg-num .bg-pct-over{color:var(--danger-text);font-weight:700;}
+    .bg-num .bg-pct-warn{color:var(--warning);font-weight:700;}
+    .bg-bar{height:7px;border-radius:4px;background:var(--card-bg);overflow:hidden;margin-top:5px;border:1px solid var(--border-color);position:relative;}
+    .bg-bar i{display:block;height:100%;border-radius:4px;background:var(--primary);transition:width .3s;}
+    .bg-bar i.warn{background:var(--warning);}
+    .bg-bar i.over{background:#ef4444;}
+    /* 超支溢出：条纹示意“超载量” + 条内右端超出百分比徽标 */
+    .bg-bar.over i{background:repeating-linear-gradient(45deg,#ef4444,#ef4444 6px,#dc2626 6px,#dc2626 12px);}
+    .bg-over-badge{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff;background:rgba(127,29,29,.85);border-radius:4px;padding:0 5px;line-height:1.5;pointer-events:none;z-index:1;}
+    .bg-status{font-size:12px;border-radius:6px;padding:1px 7px;flex:0 0 auto;}
+    .bg-status.over{background:rgba(239,68,68,.12);color:#b91c1c;}
+    /* v1.48.37：暗色下 tint 偏深，深红字压上去只有 2.49 → 换亮档 6.97 */
+    [data-theme="dark"] .bg-status.over{color:#fca5a5;}
+    .bg-status.warn{background:rgba(245,158,11,.14);color:var(--warning);}
+    .bg-status.ok{background:var(--bg-inset);color:var(--text-secondary);}
+    /* ---- 迭代 3：移动端（屏 1 主页重排：流水进首屏；屏 5 下钻触控目标） ---- */
+    @media (max-width:768px){
+      /* common.js 用内联 style.display='block' 显示页面，这里必须 !important 才能改成纵向 flex 以应用 order 重排 */
+      #pageContent{display:flex !important;flex-direction:column;}
+      .ledger-hero{order:0;}
+      #budgetCard{order:1;}
+      .book-tabs{order:2;}
+      #recordsCard{order:3;}
+      .cockpit-grid{order:4;}
+      .nw-bar{order:5;}
+      #nwHint{order:6;}
+      .acc-strip{order:7;}
+      /* 屏 5：支出构成下钻的触控目标 ≥44px，二级行 ≥36px */
+      .cat-row{min-height:44px;align-items:center;}
+      .cat-kid{min-height:36px;}
+      .cat-kid .ck-name{flex-basis:64px;}
+      .cat-kid{font-size:13px;}
+      /* 净资产条在移动端降权为 2x2 小卡，给流水让首屏 */
+      .nw-item{flex:1 1 44%;padding:8px 10px;}
+      .nw-val{font-size:16px;}
+    }
+    /* ---- 迭代 4：移动端记账抽屉（屏 2 金额键盘 / 屏 3 分类账户 / 屏 4 转账） ---- */
+    /* 复用 .modal-overlay 的开合机制（openModal 加 .open → display:flex），只把面板钉到底部 */
+    .drawer-overlay{align-items:flex-end;}
+    .qd-panel{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;margin:0 auto;
+      border-radius:18px 18px 0 0;border-bottom:0;animation:qdUp .22s ease;}
+    @keyframes qdUp{from{transform:translateY(48px);opacity:.35;}to{transform:none;opacity:1;}}
+    .qd-tabs{display:flex;background:var(--bg-inset);border-radius:10px;padding:3px;margin-bottom:10px;}
+    .qd-tabs .seg-tab{min-height:34px;}
+    .qd-amt{display:flex;align-items:baseline;justify-content:center;gap:4px;padding:10px 0 2px;min-height:64px;}
+    .qd-amt .qd-cur{font-size:20px;color:var(--text-secondary);}
+    .qd-amt .qd-num{font-size:44px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums;min-width:120px;text-align:center;}
+    .qd-amt .qd-num.empty{color:var(--text-secondary);font-weight:400;}
+    .qd-amt-sub{text-align:center;font-size:12px;color:var(--text-secondary);margin-bottom:8px;}
+    /* 自绘大数字键盘：4 列网格，右列快捷键跨行，触控目标 ≥48px */
+    .kbd{display:grid;grid-template-columns:1fr 1fr 1fr 1.15fr;gap:7px;margin-top:6px;}
+    .key{background:var(--card-bg);border:1px solid var(--border-color);border-radius:11px;
+      min-height:48px;font-size:22px;font-weight:600;font-family:inherit;color:var(--text-primary);
+      cursor:pointer;transition:background .1s;}
+    .key:active{background:var(--bg-inset);}
+    .key.fn{font-size:15px;color:var(--text-secondary);background:var(--bg-inset);font-weight:500;}
+    .key.side{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+      grid-column:4;font-size:13px;font-weight:600;padding:4px;}
+    .key.side small{font-size:12px;font-weight:400;color:var(--text-secondary);max-width:100%;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .key.side.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+    .key.side.primary small{color:rgba(255,255,255,.95);}   /* v1.48.37：.75 压绿/橙主题主色只剩 3.58，.95 → 4.79 */
+    .key.side:disabled{opacity:.45;cursor:not-allowed;}
+    .qd-step2 .form-group{margin-bottom:12px;}
+    .qd-acc-hint{font-size:12px;color:var(--primary);background:rgba(14,165,233,.08);
+      border-radius:8px;padding:6px 10px;margin-top:6px;display:none;}
+    .qd-tr-hint{font-size:12px;color:var(--text-secondary);background:var(--bg-inset);
+      border-radius:8px;padding:7px 10px;margin-bottom:12px;}
+    .qd-back{background:none;border:0;color:var(--text-secondary);font-size:13px;font-family:inherit;
+      cursor:pointer;padding:6px 0;min-height:32px;}
+    /* PC（>768px）不显示抽屉，走原弹层 */
+    @media (min-width:769px){ .drawer-overlay{display:none !important;} }
+    </style>
+
+
+<style>
+/* === v54·B3 收敛：公共交互增强已并入 theme/，此处仅保留本页专属规则 === */
+/* === P1-3 账本减负：移动端折叠「财务概览」与「筛选区」（桌面端不渲染折叠条、lgFilters 用 display:contents 保持原布局） === */
+.lg-collapse-bar, .lg-filter-toggle { display: none; }
+#lgFilters { display: contents; }
+@media (max-width: 768px) {
+  #lgOverview { display: none; }
+  #lgOverview.open { display: block; }
+  .lg-collapse-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; margin: 2px 0 12px; padding: 14px; /* UI-51：触控热区≥44px */
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--card-bg, #fff); color: var(--text-primary);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .lg-collapse-bar .lg-caret { color: var(--text-secondary); font-size: 12px; }
+  .lg-collapse-bar.open { border-color: var(--primary); color: var(--primary); }
+  #lgFilters { display: none; flex-basis: 100%; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #lgFilters.open { display: flex; }
+  .lg-filter-toggle { display: inline-flex; }
+  /* 打磨-移动端表格：金额列不折行（避免 -¥300.0 被截断），单元格收紧为金额列让位 */
+  #recordsWrap .data-table td, #recordsWrap .data-table th { padding: 8px 6px; font-size: 12px; }
+  #recordsWrap .data-table td:nth-child(5), #recordsWrap .data-table th:nth-child(5) { white-space: nowrap; }
+  /* 打磨-触控目标≥44px：页面小按钮统一加高；hint 内文字链用 padding+负 margin 扩热区（不改视觉） */
+  #pageContent .btn-sm { min-height: 44px; }
+  #recordsCard .field-hint a { display: inline-block; padding: 14px 0; margin: -14px 0; }
+}
+</style>
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- 概览 -->
+        <div class="ledger-hero">
+            <div class="lh-card">
+                <div class="lh-label">本月支出</div>
+                <div class="lh-value amount-expense" id="hExpense">¥0</div>
+                <div class="field-hint" id="hExpenseSub">—</div>
+            </div>
+            <div class="lh-card">
+                <div class="lh-label">本月收入</div>
+                <div class="lh-value amount-income" id="hIncome">¥0</div>
+                <div class="field-hint" id="hIncomeSub">—</div>
+            </div>
+            <div class="lh-card">
+                <div class="lh-label">本月结余</div>
+                <div class="lh-value" id="hNet">¥0</div>
+                <div class="field-hint" id="hNetSub">—</div>
+            </div>
+            <div class="lh-card">
+                <div class="lh-label">账目笔数</div>
+                <div class="lh-value" id="hCount">0</div>
+                <div class="field-hint" id="hCountSub">—</div>
+            </div>
+        </div>
+
+        <!-- 场景账本切换（迭代 2）：装修/旅行这类开销单独成册，不污染日常支出（P1-3：上移，保持常显） -->
+        <div class="book-tabs" id="bookTabs"></div>
+
+        <!-- P1-3 账本减负：移动端把 预算/净资产/账户卡/图表 折叠进「财务概览」（默认收起、记住偏好），桌面端不受影响 -->
+        <button type="button" class="lg-collapse-bar" id="lgMoreToggle" onclick="lgToggleOverview()" aria-expanded="false" aria-controls="lgOverview">
+            <span>财务概览 · 预算 / 净资产 / 图表</span><span class="lg-caret" id="lgMoreCaret">▾</span>
+        </button>
+        <div id="lgOverview">
+        <!-- 本月预算（迭代 3）：80% 黄 / 100% 红，超支会进首页与晨报 -->
+        <div class="card" id="budgetCard" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 本月预算</span>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:12px;color:var(--text-secondary);" id="budgetMonthLabel"></span>
+                    <button class="btn btn-primary btn-sm" onclick="openBudgetModal()">预算设置</button>
+                </div>
+            </div>
+            <div id="budgetBody"></div>
+        </div>
+
+        <!-- 净资产 + 账户（迭代 1） -->
+        <div class="nw-bar">
+            <div class="nw-item">
+                <div class="nw-label">总资产</div>
+                <div class="nw-val amount-income" id="nwAsset">¥0</div>
+            </div>
+            <div class="nw-item">
+                <div class="nw-label">总负债</div>
+                <div class="nw-val amount-expense" id="nwDebt">¥0</div>
+            </div>
+            <div class="nw-item">
+                <div class="nw-label">净资产</div>
+                <div class="nw-val" id="nwNet">¥0</div>
+            </div>
+            <div class="nw-item">
+                <div class="nw-label">账户余额合计</div>
+                <div class="nw-val" id="nwLedger" style="font-size:17px;">¥0</div>
+            </div>
+        </div>
+        <div class="field-hint" id="nwHint" style="margin:-6px 0 12px;">—</div>
+
+        <!-- 账户横滑卡：点击按账户筛选流水 -->
+        <div class="acc-strip" id="accStrip"></div>
+
+        <!-- 分类占比 + 趋势 -->
+        <div class="cockpit-grid" style="margin-bottom:16px;">
+            <div class="cockpit-panel">
+                <div class="panel-head">
+                    <span class="title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10H12z"/></svg> 支出构成</span>
+                    <span style="font-size:12px;color:var(--text-secondary);" id="catMonthLabel"></span>
+                </div>
+                <div class="cat-ring" id="catRing" aria-hidden="false"></div>
+                <div class="cat-list" id="expenseCats"></div>
+            </div>
+            <div class="cockpit-panel">
+                <div class="panel-head">
+                    <span class="title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> 近 6 个月趋势</span>
+                    <span style="font-size:12px;color:var(--text-secondary);">红=支出 绿=收入</span>
+                </div>
+                <div class="trend-chart" id="trendChart"></div>
+                <div class="field-hint" id="trendAnchorHint" style="display:none;text-align:center;margin-top:6px;">趋势固定展示近 6 个月（以本月为锚），与上方筛选月份无关</div>
+            </div>
+        </div>
+        </div><!-- /lgOverview -->
+
+        <!-- 明细 -->
+        <div class="card" id="recordsCard">
+            <div class="card-header">
+                <span class="card-title">收支明细</span>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <!-- P1-3 账本减负：移动端 6 个筛选项 + 管理按钮收进「筛选」折叠区（桌面端 display:contents 保持原布局） -->
+                    <button type="button" class="btn btn-secondary btn-sm lg-filter-toggle" id="lgFilterToggle" onclick="lgToggleFilters()" aria-expanded="false" aria-controls="lgFilters">筛选 ▾</button>
+                    <div id="lgFilters">
+                    <input type="month" id="filterMonth" onchange="loadAll()" style="width:auto;">
+                    <select id="filterKind" onchange="loadAll()" style="width:auto;">
+                        <option value="">全部类型</option>
+                        <option value="expense">支出</option>
+                        <option value="income">收入</option>
+                        <option value="transfer"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> 转账</option>
+                    </select>
+                    <select id="filterCategory" onchange="loadAll()" style="width:auto;"></select>
+                    <select id="filterAccount" onchange="loadAll()" style="width:auto;"></select>
+                    <select id="filterBook" onchange="onFilterBookChange()" style="width:auto;"></select>
+                    <select id="filterMember" onchange="loadAll()" style="width:auto;"></select>
+                    <button class="btn btn-secondary btn-sm" onclick="openAccountModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg> 账户管理</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openBookModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> 账本管理</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openCategoryModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> 分类管理</button>
+                    <button class="btn btn-secondary btn-sm" onclick="exportCSV()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> 导出CSV</button>
+                    <button class="btn btn-secondary btn-sm" onclick="openDedupModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg> 重复清理</button>
+                    <button class="btn btn-ai btn-sm" onclick="openImportModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 导入账单</button>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openRecordModal()">＋ 记一笔</button>
+                    <button class="btn btn-ai btn-sm" onclick="openReceiptModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> 票据速记</button>
+                </div>
+            </div>
+            <p class="field-hint" style="margin-bottom:12px;">
+                「人情往来」由 <a href="/gift-records">人情记账</a> 自动汇总，无需重复录入；如需修改请到人情记账页操作。
+            </p>
+            <div id="recordsWrap"></div>
+        </div>
+    </div>
+
+    <!-- 记账弹窗 -->
+    <div id="recordModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="recordModalTitle">记一笔</h3>
+                <button class="modal-close" onclick="closeModal('recordModal')">&times;</button>
+            </div>
+            <div class="seg-tabs" id="lKindTabs">
+                <button type="button" class="seg-tab active" data-kind="expense" onclick="setRecordKind('expense')">支出</button>
+                <button type="button" class="seg-tab" data-kind="income" onclick="setRecordKind('income')">收入</button>
+                <button type="button" class="seg-tab" data-kind="transfer" onclick="setRecordKind('transfer')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> 转账</button>
+            </div>
+            <input type="hidden" id="lKind" value="expense">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>金额（元）*</label>
+                    <input type="number" id="lAmount" min="0" step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>日期 *</label>
+                    <input type="date" id="lDate">
+                </div>
+            </div>
+            <div class="form-row" id="rowNormal">
+                <div class="form-group">
+                    <label>分类</label>
+                    <!-- 二级宫格（迭代 2）：先点一级，再点二级；#lCategory 作为取值源与旧逻辑兼容 -->
+                    <div class="cat-picker" id="catPicker"></div>
+                    <select id="lCategory" style="display:none;" tabindex="-1" aria-hidden="true"
+                        onchange="syncCatPickerFromSelect(); renderCatPicker();"></select>
+                </div>
+            </div>
+            <div class="form-row" id="rowNormal3">
+                <div class="form-group">
+                    <label>账户</label>
+                    <select id="lAccount" onchange="rememberAccount()"></select>
+                </div>
+                <div class="form-group">
+                    <label>账本</label>
+                    <select id="lBook"></select>
+                </div>
+            </div>
+            <div class="form-row" id="rowTransfer" style="display:none;">
+                <div class="form-group">
+                    <label>从账户（转出）*</label>
+                    <select id="lFromAccount"></select>
+                </div>
+                <div class="form-group">
+                    <label>到账户（转入）*</label>
+                    <select id="lToAccount"></select>
+                </div>
+            </div>
+            <p class="field-hint" id="trHint" style="display:none;margin:-4px 0 10px;">
+                转账只改变两个账户的余额，<strong>不计入收入也不计入支出</strong>。
+            </p>
+            <div class="form-row" id="rowNormal2">
+                <div class="form-group">
+                    <label>支付方式</label>
+                    <select id="lMethod">
+                        <option value="">未指定</option>
+                        <option value="微信">微信</option>
+                        <option value="支付宝">支付宝</option>
+                        <option value="银行卡">银行卡</option>
+                        <option value="现金">现金</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>关联家人</label>
+                    <select id="lMember"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>备注 <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">（点 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> 说「午餐三十块」AI 自动填单）</span></label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="lRemark" placeholder="如：超市采购、大宝补习班" style="flex:1;min-width:0;">
+                    <script data-voice-mic data-target="lRemark" data-ai="ledger"></script>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('recordModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveRecord()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 移动端记账抽屉（迭代 4）：屏 2 金额键盘 → 屏 3 分类账户 / 屏 4 转账。
+         保存时把状态写进 #recordModal 的表单字段并复用 saveRecord()，不重复保存逻辑；PC 端仍走原弹层。 -->
+    <div id="quickDrawer" class="modal-overlay drawer-overlay">
+        <div class="modal qd-panel">
+            <div class="modal-header">
+                <h3 id="qdTitle">记一笔</h3>
+                <button class="modal-close" onclick="closeQuickDrawer()">&times;</button>
+            </div>
+            <div class="qd-tabs" id="qdTabs">
+                <button type="button" class="seg-tab active" data-kind="expense" onclick="qdSetKind('expense')">支出</button>
+                <button type="button" class="seg-tab" data-kind="income" onclick="qdSetKind('income')">收入</button>
+                <button type="button" class="seg-tab" data-kind="transfer" onclick="qdSetKind('transfer')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> 转账</button>
+            </div>
+            <!-- 第 1 步：金额 + 自绘大数字键盘（不走系统键盘，避免遮住分类宫格） -->
+            <div id="qdStep1">
+                <div class="qd-amt"><span class="qd-cur">¥</span><span class="qd-num empty" id="qdNum">0.00</span></div>
+                <div class="qd-amt-sub">只填金额就能记，其余都有默认值</div>
+                <div class="kbd">
+                    <button type="button" class="key" onclick="qdKey('7')">7</button>
+                    <button type="button" class="key" onclick="qdKey('8')">8</button>
+                    <button type="button" class="key" onclick="qdKey('9')">9</button>
+                    <button type="button" class="key side" id="qdLastKey" style="grid-row:span 2;" onclick="qdUseLastCat()">
+                        <span>上次</span><small id="qdLastLbl">分类</small>
+                    </button>
+                    <button type="button" class="key" onclick="qdKey('4')">4</button>
+                    <button type="button" class="key" onclick="qdKey('5')">5</button>
+                    <button type="button" class="key" onclick="qdKey('6')">6</button>
+                    <button type="button" class="key side primary" style="grid-row:span 2;" onclick="qdNext()">
+                        <span>下一步</span><small id="qdNextHint">选分类 ›</small>
+                    </button>
+                    <button type="button" class="key" onclick="qdKey('1')">1</button>
+                    <button type="button" class="key" onclick="qdKey('2')">2</button>
+                    <button type="button" class="key" onclick="qdKey('3')">3</button>
+                    <button type="button" class="key fn" onclick="qdKey('.')">.</button>
+                    <button type="button" class="key" onclick="qdKey('0')">0</button>
+                    <button type="button" class="key fn" onclick="qdKey('bak')">⌫</button>
+                </div>
+            </div>
+            <!-- 第 2 步：分类宫格 + 账户（自动带出上次同分类账户）+ 保存 -->
+            <div id="qdStep2" style="display:none;" class="qd-step2">
+                <button type="button" class="qd-back" onclick="qdBack()">‹ 返回改金额</button>
+                <div class="qd-amt" style="min-height:40px;padding-top:2px;">
+                    <span class="qd-cur">¥</span><span class="qd-num" style="font-size:26px;" id="qdNum2">0.00</span>
+                </div>
+                <div id="qdCatWrap">
+                    <div class="form-group">
+                        <label>分类</label>
+                        <div class="cat-picker" id="qdCatPicker"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>账户</label>
+                        <select id="qdAccount" onchange="qdOnAccount()"></select>
+                        <div class="qd-acc-hint" id="qdAccHint"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>账本</label>
+                        <select id="qdBook"></select>
+                    </div>
+                </div>
+                <div id="qdTrWrap" style="display:none;">
+                    <div class="qd-tr-hint">转账只改变两个账户的余额，<strong>不计入收入也不计入支出</strong>。</div>
+                    <div class="form-group"><label>从账户（转出）*</label><select id="qdFrom" onchange="qdOnFrom()"></select></div>
+                    <div class="form-group"><label>到账户（转入）*</label><select id="qdTo" onchange="qdOnTo()"></select></div>
+                </div>
+                <div class="form-group" id="qdRemarkWrap">
+                    <label>日期</label>
+                    <input type="date" id="qdDate">
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <input type="text" id="qdRemark" placeholder="选填，如：超市采购">
+                </div>
+                <div class="modal-footer" style="margin-top:14px;">
+                    <button class="btn btn-secondary" onclick="closeQuickDrawer()">取消</button>
+                    <button class="btn btn-primary" onclick="qdSave()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 票据速记弹窗 -->
+    <div id="receiptModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> 票据速记</h3>
+                <button class="modal-close" onclick="closeModal('receiptModal')">&times;</button>
+            </div>
+            <div id="rptStepPick">
+                <div style="text-align:center;padding:4px 0 12px;">
+                    <button class="btn btn-primary" onclick="document.getElementById('rptFile').click()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> 拍照 / 选票据</button>
+                    <input type="file" id="rptFile" accept="image/*" style="display:none;" onchange="onRptFile()">
+                </div>
+                <img id="rptPreview" alt="票据预览" style="display:none;width:100%;max-height:200px;object-fit:contain;border-radius:10px;margin-bottom:12px;">
+                <button class="btn btn-ai" style="width:100%;" id="rptParseBtn" onclick="parseReceipt()" disabled><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI 识别票据</button>
+                <div id="rptError" class="field-hint" style="margin-top:8px;display:none;color:var(--danger);"></div>
+                <p class="field-hint" style="margin-top:10px;">拍照识别小票 / 收据，自动填金额、日期、分类后入账。需要已配置支持看图的 AI 视觉模型（如 qwen2.5-vl / 豆包视觉）。</p>
+            </div>
+            <div id="rptStepForm" style="display:none;">
+                <div id="rptWarn" class="field-hint" style="display:none;color:var(--warning-text,#b45309);background:rgba(245,158,11,.12);border-radius:8px;padding:8px 12px;margin-bottom:12px;"></div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>金额（元）*</label>
+                        <input type="number" id="rptAmount" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label>日期 *</label>
+                        <input type="date" id="rptDate">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>分类</label>
+                        <select id="rptCategory"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>支付方式</label>
+                        <select id="rptMethod">
+                            <option value="">未指定</option>
+                            <option value="微信">微信</option>
+                            <option value="支付宝">支付宝</option>
+                            <option value="银行卡">银行卡</option>
+                            <option value="现金">现金</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>关联家人</label>
+                        <select id="rptMember"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>识别模型</label>
+                        <div id="rptModel" style="font-size:12px;color:var(--text-secondary);padding-top:7px;">--</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <input type="text" id="rptRemark" placeholder="如：盒马鲜生 日用品">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('receiptModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveReceipt()">保存到账本</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入账单 CSV -->
+    <div id="importModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> 导入账单</h3>
+                <button class="modal-close" onclick="closeModal('importModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">
+                    从支付宝/微信导出账单 CSV，粘贴到下面。AI 自动识别每笔交易并分类，一键入账。
+                </p>
+                <label style="font-size:13px;color:var(--muted);">选择 CSV 文件（自动读取内容）</label>
+                <input type="file" id="impFile" accept=".csv" style="margin:8px 0 12px;display:block;" onchange="readCsvFile()">
+                <textarea id="impCsv" rows="10" placeholder="或直接粘贴 CSV 内容（需包含"交易时间"和"金额"列）"
+                    style="width:100%;font-family:monospace;font-size:12px;"></textarea>
+                <p id="impErr" style="color:var(--danger);font-size:13px;display:none;margin-top:8px;"></p>
+                <p id="impResult" style="color:var(--ok);font-size:14px;display:none;margin-top:8px;"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('importModal')">取消</button>
+                <button class="btn btn-ai" id="impBtn" onclick="doImport()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI 分类并导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类管理 -->
+    <!-- 账户管理弹窗（迭代 1） -->
+    <div id="accountModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>账户管理</h3>
+                <button class="modal-close" onclick="closeModal('accountModal')">&times;</button>
+            </div>
+            <p class="field-hint" style="margin-bottom:12px;">
+                账户余额 = 期初余额 + 该账户全部流水（收入 − 支出）+ 转入 − 转出，实时推导、不落盘。
+            </p>
+            <div id="accManageList" style="max-height:260px;overflow-y:auto;margin-bottom:14px;"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>新增账户名称</label>
+                    <input type="text" id="newAccName" placeholder="如：建行储蓄卡" style="flex:1;">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="newAccType">
+                        <option value="debit">储蓄卡</option>
+                        <option value="credit">信用卡</option>
+                        <option value="ewallet">电子钱包</option>
+                        <option value="cash">现金</option>
+                        <option value="investment">投资理财</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>图标</label>
+                    <input type="text" id="newAccIcon" placeholder="🏦" maxlength="4" style="flex:1;">
+                </div>
+                <div class="form-group">
+                    <label>期初余额（元）</label>
+                    <input type="number" id="newAccInit" step="0.01" placeholder="0.00">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('accountModal')">关闭</button>
+                <button class="btn btn-primary" onclick="addAccount()">＋ 创建账户</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 账本管理弹窗（迭代 2） -->
+    <div id="bookModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>账本管理</h3>
+                <button class="modal-close" onclick="closeModal('bookModal')">&times;</button>
+            </div>
+            <p class="field-hint" style="margin-bottom:12px;">
+                账本用来把「装修」「旅行」这类一次性开销单独成册。账本内的支出不计入日常账本的月度数字；
+                有流水的账本不能直接删除，需先把流水转移到其他账本。
+            </p>
+            <div id="bookManageList" style="max-height:280px;overflow-y:auto;margin-bottom:14px;"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>新增账本名称</label>
+                    <input type="text" id="newBookName" placeholder="如：装修账本" style="flex:1;">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="newBookKind">
+                        <option value="project">项目/装修</option>
+                        <option value="travel">旅行</option>
+                        <option value="child">育儿</option>
+                        <option value="vehicle">车辆</option>
+                        <option value="big-ticket">大额支出</option>
+                        <option value="family">家庭</option>
+                        <option value="daily">日常</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>图标</label>
+                    <input type="text" id="newBookIcon" placeholder="📒" maxlength="4" style="flex:1;">
+                </div>
+                <div class="form-group">
+                    <label>主题色</label>
+                    <input type="text" id="newBookColor" placeholder="#3b82f6" maxlength="20">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('bookModal')">关闭</button>
+                <button class="btn btn-primary" onclick="addBook()">＋ 创建账本</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预算设置弹窗（迭代 3） -->
+    <div id="budgetModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>预算设置 · <span id="budgetModalMonth"></span></h3>
+                <button class="modal-close" onclick="closeModal('budgetModal')">&times;</button>
+            </div>
+            <p class="field-hint" style="margin-bottom:12px;">
+                预算按自然月生效：总预算管全部支出（含人情往来），分类预算只挂一级支出分类。
+                用到 80% 变黄、100% 变红，超支会提醒到首页与每日晨报。
+            </p>
+            <div id="budgetManageList" style="max-height:260px;overflow-y:auto;margin-bottom:14px;"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>预算对象</label>
+                    <select id="newBudgetTarget">
+                        <option value=""><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 总预算（全部支出）</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>金额（元）</label>
+                    <input type="number" id="newBudgetAmount" min="0" step="0.01" placeholder="如 5000">
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="copyLastMonthBudgets()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> 复制上月预算</button>
+                <span style="flex:1;"></span>
+                <button class="btn btn-secondary" onclick="closeModal('budgetModal')">关闭</button>
+                <button class="btn btn-primary" onclick="addBudget()">保存预算</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重复清理弹窗（P3-7） -->
+    <div id="dedupModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg> 重复记录清理</h3>
+                <button class="modal-close" onclick="closeModal('dedupModal')">&times;</button>
+            </div>
+            <p class="field-hint" style="margin-bottom:12px;">
+                按「同日期 · 同类型 · 同金额」聚类，备注不参与分组。每组默认保留最早一条，可点选改留。
+            </p>
+            <div id="dedupBody" style="max-height:340px;overflow-y:auto;margin-bottom:12px;"></div>
+            <div id="dedupSummary" style="font-size:12.5px;color:var(--text-secondary);margin-bottom:12px;"></div>
+            <div class="modal-footer" style="display:flex;gap:8px;">
+                <span style="flex:1;"></span>
+                <button class="btn btn-secondary" onclick="closeModal('dedupModal')">取消</button>
+                <button class="btn btn-primary" onclick="confirmDedup()">确认清理</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分类管理弹窗 -->
+    <div id="categoryModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>分类管理</h3>
+                <button class="modal-close" onclick="closeModal('categoryModal')">&times;</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                <div>
+                    <div class="section-title">支出分类</div>
+                    <div class="form-inline" style="margin-bottom:8px;">
+                        <input type="text" id="newExpenseCat" placeholder="如：宠物" style="flex:1;">
+                        <button class="btn btn-primary btn-sm" onclick="addCategory('expense')">添加</button>
+                    </div>
+                    <div class="form-inline" style="margin-bottom:10px;">
+                        <select id="newExpenseSubParent" style="flex:0 0 auto;"></select>
+                        <input type="text" id="newExpenseSub" placeholder="二级名，如：午餐" style="flex:1;min-width:0;">
+                        <button class="btn btn-secondary btn-sm" onclick="addCategory('expense', document.getElementById('newExpenseSubParent').value)">＋二级</button>
+                    </div>
+                    <div id="expenseCatList" style="max-height:240px;overflow-y:auto;"></div>
+                </div>
+                <div>
+                    <div class="section-title">收入分类</div>
+                    <div class="form-inline" style="margin-bottom:8px;">
+                        <input type="text" id="newIncomeCat" placeholder="如：房租" style="flex:1;">
+                        <button class="btn btn-primary btn-sm" onclick="addCategory('income')">添加</button>
+                    </div>
+                    <div class="form-inline" style="margin-bottom:10px;">
+                        <select id="newIncomeSubParent" style="flex:0 0 auto;"></select>
+                        <input type="text" id="newIncomeSub" placeholder="二级名，如：年终奖" style="flex:1;min-width:0;">
+                        <button class="btn btn-secondary btn-sm" onclick="addCategory('income', document.getElementById('newIncomeSubParent').value)">＋二级</button>
+                    </div>
+                    <div id="incomeCatList" style="max-height:240px;overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('ledger', '家庭账本');
+        let categories = [], members = [], records = [], gifts = [], summary = null, editingId = null;
+        let accounts = [], balances = null, curAccFilter = '';
+        /* 迭代 2：场景账本 + 二级分类 */
+        let books = [], bookStat = null, curBookId = '';
+        let catTree = [], curCatParent = null, expandedCats = {};
+        /* 迭代 3：月度预算 */
+        let budgetStat = null;
+        /* 打磨：静态数据缓存键 + 无 bookId 时的全量 summary（供「全部账本」chip 口径） + 趋势缓存 */
+        let lastStaticKey = '', lastAllSummary = null, trendRows = [];
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function money(n) { return '¥' + (+n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        /* 负数金额写成 -¥1,234.56，而不是 ¥-1,234.56（后者像笔误） */
+        function moneySigned(n) {
+            const v = +n || 0;
+            return (v < 0 ? '-¥' : '¥') + Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function monthOf() {
+            const v = document.getElementById('filterMonth').value;
+            return v || todayStr().slice(0, 7);
+        }
+
+        async function loadAll() {
+            const month = monthOf();
+            const params = new URLSearchParams({
+                month,
+                kind: document.getElementById('filterKind').value,
+                categoryId: document.getElementById('filterCategory').value,
+                memberId: document.getElementById('filterMember').value
+            });
+            const accFilter = document.getElementById('filterAccount').value;
+            if (accFilter) params.set('accountId', accFilter);
+            /* 账本筛选：切换器与筛选下拉任一非空即生效（两者保持同步） */
+            const bkId = curBookId || document.getElementById('filterBook').value;
+            if (bkId) params.set('bookId', bkId);
+            /* 静态数据（分类/家人/趋势/余额/账本/预算）只随 月份/账本 变化重拉；
+               流水类筛选（类型/分类/家人/账户）只重拉 records+summary+gifts，9 个请求降到 3 个 */
+            const staticKey = month + '|' + bkId;
+            const needStatic = staticKey !== lastStaticKey;
+            const jobs = [
+                apiGet('/api/ledger/records?' + params.toString()),
+                apiGet('/api/ledger/summary?month=' + month + (bkId ? '&bookId=' + bkId : '')),
+                apiGet('/api/gift-records?year=' + month.slice(0, 4))
+            ];
+            if (needStatic) {
+                lastStaticKey = staticKey;
+                jobs.push(
+                    apiGet('/api/ledger/categories?all=1'),
+                    apiGet('/api/family'),
+                    apiGet('/api/ledger/trend?months=6'),
+                    apiGet('/api/ledger/accounts/balances?month=' + month),
+                    apiGet('/api/ledger/books?stat=1&month=' + month),
+                    apiGet('/api/ledger/budgets?month=' + month)
+                );
+            }
+            const out = await Promise.all(jobs);
+            records = out[0].data || [];
+            summary = out[1].data || { byCategory: { expense: [], income: [] } };
+            gifts = (out[2].data || []).filter(g => (g.date || '').startsWith(month));
+            curAccFilter = accFilter;
+            if (needStatic) {
+                categories = out[3].data || [];
+                members = out[4].data || [];
+                trendRows = out[5].data || [];
+                balances = out[6].data || null;
+                accounts = (balances && balances.accounts) || [];
+                bookStat = out[7].data || null;
+                books = (bookStat && bookStat.books) || [];
+                budgetStat = out[8].data || null;
+                /* 一级 → 二级 索引（分类接口 ?all=1 返回扁平全表，含 parentId） */
+                catTree = categories.filter(c => !c.parentId)
+                    .map(p => Object.assign({}, p, { children: categories.filter(c => c.parentId === p.id) }));
+            }
+            /* 无 bookId 时缓存全量口径：子账本视图下「全部账本」chip 小字仍显示全账本数字 */
+            if (!bkId) lastAllSummary = summary;
+            renderHero(); renderNetWorth(); renderAccounts(); renderBooks();
+            renderBudgets(); renderCats(); renderTrend(trendRows); renderFilters(); renderRecords();
+        }
+
+        /* ---- FIX-3：emoji 图标映射为 Lucide 蓝色 SVG（渲染层替换，不改业务数据） ---- */
+        const ICON_MAP = {
+  '🍚': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
+  '🧺': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 11 4-7"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="M4.5 15.5h15"/><path d="M12 11a2 2 0 0 0-2 2v2"/><path d="M12 11a2 2 0 0 1 2 2v2"/></svg>',
+  '🚗': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>',
+  '🏠': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  '💊': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>',
+  '📚': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
+  '🎁': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>',
+  '🎬': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>',
+  '👕': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>',
+  '📦': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+  '💼': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+  '📈': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>',
+  '📉': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>',
+  '🏆': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+  '🏦': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>',
+  '👶': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
+  '🧧': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg>',
+  '🐾': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>',
+  '💰': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>',
+  '🎊': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.42c.05.27.1.55.16.83.1.52.43 1 1.05 1.22.3.1.61.16.93.17"/><path d="M5 12c0 4 4 8 8 8"/><path d="M12 5c-4 0-8 4-8 8"/></svg>',
+  '👜': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+  '📺': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="15" x="2" y="7" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>',
+  '💄': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.309-.438-.71-.438-1.125 0-1.08.915-1.843 2.02-1.843h.922c2.759 0 5.05-1.723 5.05-5.052C20.765 5.19 16.883 2 12 2z"/></svg>',
+  '🍼': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
+  '👟': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8.25c.03-2.25 1.66-4.25 4.24-4.25 1.52 0 2.76 1 2.76 2.5V9"/><path d="M20 12v-2.38c0-2.12 1.03-3.12 1-5.37-.02-2.25-1.66-4.25-4.24-4.25C15.24 0 14 1 14 2.5V6"/><path d="M4 12v8c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8"/><path d="M16 22v-4c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v4"/></svg>',
+  '🧷': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+  '💐': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3v1m-3 3h1"/><circle cx="12" cy="8" r="2"/><path d="M12 10v6"/><path d="M12 22c-4.2 0-7-2.2-7-5 0-1.8 1.5-3.2 3-4.5 1.5 1.2 3 1.5 4 1.5s2.5-.3 4-1.5c1.5 1.3 3 2.7 3 4.5 0 2.8-2.8 5-7 5z"/></svg>',
+  '✏️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>',
+  '🎨': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.309-.438-.71-.438-1.125 0-1.08.915-1.843 2.02-1.843h.922c2.759 0 5.05-1.723 5.05-5.052C20.765 5.19 16.883 2 12 2z"/></svg>',
+  '🎦': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>',
+  '🧳': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20h0a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2"/><path d="M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14"/><path d="M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>',
+  '🏃': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M4 21 8.5 7.5"/><path d="m17 11-4.5 2-2.5 7"/></svg>',
+  '📕': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>',
+  '🎮': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg>',
+  '💵': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>',
+  '💳': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>',
+  '↩️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>',
+  '🧾': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>',
+  '💚': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
+  '🛠️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  '✈️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>',
+  '🐜': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg>',
+    '👩‍👨‍👧': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  '👨‍👩‍👧': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  '🪀': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>',
+  '❓': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+  '🧩': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.478-.802-.947.42-.31.778-.792.91-1.387a1.05 1.05 0 0 0-.66-1.29 1.06 1.06 0 0 0-1.29.66c-.13.59-.47 1.077-.91 1.387v2.58a.98.98 0 0 1-.277.836l-1.611 1.611a1.704 1.704 0 0 1-3.408 0l-1.611-1.611a.98.98 0 0 1-.277-.837v-2.58c.44-.31.78-.797.91-1.387a1.06 1.06 0 0 0-.66-1.29 1.05 1.05 0 0 0-1.29.66c-.132.595-.49 1.077-.91 1.387-.028.004-.056 0-.084-.007-.47-.07-.802-.478-.802-.947 0-.617.236-1.234.706-1.704l1.568-1.568c.23-.23.338-.556.289-.878a1.1 1.1 0 0 0-1.1-.96H2.5a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1h3.89a1.1 1.1 0 0 0 1.1-1.1v-.3a1.1 1.1 0 0 1 2.2 0v.3a1.1 1.1 0 0 0 1.1 1.1h3.89a1 1 0 0 1 1 1v3.89a1.1 1.1 0 0 0 1.1 1.1h.3a1.1 1.1 0 0 1 1.1 1.1v.3a1.1 1.1 0 0 1-.66 1.05Z"/></svg>',
+  '💉': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.7 1.5-2.7 1.5-.3 0-.5-.2-.5-.5 0-.7.2-1.8 1.5-2.7L19 9"/><path d="M11 5l6 6"/><path d="m6 2 6 6"/></svg>',
+  '🏷️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
+  '⏰': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></svg>',
+  '🎖️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.15A2 2 0 0 1 6 1.26 3.5 3.5 0 0 1 7.5 3.5a3.5 3.5 0 0 1 1.5-2.24A2 2 0 0 1 10.6 2.15l1.6 2.79a2 2 0 0 1 .13 2.2L7.21 15"/><path d="m4.83 16.19 2.38 6.31a1 1 0 0 0 1.48.57 1 1 0 0 0 .53-.9V15"/><path d="m19.17 15-4.54-7.86a2 2 0 0 1 .13-2.2L16.6 2.15A2 2 0 0 1 18 1.26 3.5 3.5 0 0 1 19.5 3.5a3.5 3.5 0 0 1 1.5-2.24 2 2 0 0 1 2.4 1.13l1.6 2.79a2 2 0 0 1 .13 2.2L19.17 15"/><path d="m19.17 16.19-2.38 6.31a1 1 0 0 1-1.48.57 1 1 0 0 1-.53-.9V15"/></svg>',
+  '⚠️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  '📊': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>',
+  '🚵': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>',
+  '🥬': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>',
+  '🍲': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M7 21h10"/><path d="M19.5 12 22 6"/><path d="M16.25 3c.27.1.8.53.75 1.36-.06.83-.37 1.2-.75 1.36-.38.15-.73.23-.75.74-.01.5.35.71.75.75"/><path d="M11.25 3c.27.1.8.53.75 1.36-.06.83-.38 1.2-.75 1.36-.38.15-.73.23-.75.74-.01.5.35.71.75.75"/></svg>',
+  '🌙': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+  '🥤': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 8 1.75 12.28a2 2 0 0 0 2 1.72h4.54a2 2 0 0 0 2-1.72L18 8"/><path d="M5 8h14"/><path d="M7 15a6.47 6.47 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/><path d="m12 8 1-6h2"/></svg>',
+  '🧽': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+  '🧻': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>',
+  '🍜': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M7 21h10"/><path d="M19.5 12 22 6"/><path d="M16.25 3c.27.1.8.53.75 1.36-.06.83-.37 1.2-.75 1.36-.38.15-.73.23-.75.74-.01.5.35.71.75.75"/><path d="M11.25 3c.27.1.8.53.75 1.36-.06.83-.38 1.2-.75 1.36-.38.15-.73.23-.75.74-.01.5.35.71.75.75"/></svg>',
+  '🧴': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>',
+  '🥣': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
+  '🍱': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
+  '🔌': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>',
+  '🌐': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+  '🩺': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>',
+  '🔥': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+  '🏢': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>',
+  '📋': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>',
+  '🎓': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>',
+  '🗽️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6v4"/><path d="M14 14h-4"/><path d="M14 18h-4"/><path d="M14 8h-4"/><path d="M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M18 22V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v18"/></svg>',
+  '🦷': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>',
+  '🚕': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>',
+  '⛽️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="15" y1="22" y2="22"/><line x1="4" x2="14" y1="9" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/></svg>',
+  '🚌': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg>',
+  '🚇': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/></svg>',
+  '🅿️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg>',
+  '🏘️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  '💡': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>',
+  '🛣️': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19 5.5 5"/><path d="m19.5 5 1.5 14"/><path d="M8.5 12h7"/><path d="m8.5 5 2 14"/><path d="m13.5 5 2 14"/><path d="M12 3v2"/><path d="M12 19v2"/></svg>',
+  '🔧': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+        };
+        function normIcon(ic) {
+            if (!ic || ic.indexOf('<svg') === 0) return ic;
+            const key = ic.replace(/\uFE0F/g, '');
+            /* 未命中映射表时回退原 emoji 文本：用户自选的图标不应静默丢失成无关的通用图标 */
+            let hit = ICON_MAP[key] || ICON_MAP[key + '\uFE0F'];
+            if (!hit) {
+                /* 兜底：无 ZWJ 的 emoji 组合（如「👨👩👧」三表情直接拼接，缺 U+200D）
+                   逐个尝试插入 ZWJ 的候选形式再查表，命中规范家庭等组合图标 */
+                const arr = Array.from(key);
+                const emojiIdx = [];
+                arr.forEach((ch, i) => { if (ch.codePointAt(0) >= 0x1F000) emojiIdx.push(i); });
+                for (let mask = 1; mask < (1 << Math.max(0, emojiIdx.length - 1)) && !hit; mask++) {
+                    const a = arr.slice();
+                    let ins = 0;
+                    for (let i = 0; i < emojiIdx.length - 1; i++) {
+                        if (mask & (1 << i)) a.splice(emojiIdx[i] + 1 + ins++, 0, '\u200D');
+                    }
+                    const cand = a.join('');
+                    hit = ICON_MAP[cand] || ICON_MAP[cand + '\uFE0F'];
+                }
+            }
+            return hit || escapeHtml(key);
+        }
+
+        /* ---- 迭代 2：账本切换条（全部 / 各账本 · 本月支出） ---- */
+        function renderBooks() {
+            const box = document.getElementById('bookTabs');
+            if (!box) return;
+            const total = bookStat && books.length
+                ? books.reduce((s, b) => s + ((b.stat && b.stat.expense) || 0), 0) : 0;
+            const chip = (id, label, icon, sub, active) => `<button type="button" class="book-tab${active ? ' active' : ''}"
+                onclick="filterByBook('${id}')" title="点击只看该账本流水">
+                <span class="bt-name">${icon || ''} ${escapeHtml(label)}</span>
+                <span class="bt-sub">${sub}</span></button>`;
+            box.innerHTML = chip('', '全部账本', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', '本月 ' + money((lastAllSummary || summary).manualExpense), !curBookId)
+                + books.map(b => chip(String(b.id), b.name, normIcon(b.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+                    '本月 ' + money((b.stat && b.stat.expense) || 0) + ((b.stat && b.stat.count) ? ' · ' + b.stat.count + ' 笔' : ''),
+                    String(curBookId) === String(b.id))).join('')
+                + chip('__manage', '管理账本…', '', '新增 / 转移', false);
+        }
+        /* P1-XX：保存/删除记账后账本统计可能过期——loadAll 的 needStatic 缓存（月份/账本不变时）
+           不会重拉 books?stat=1，而 summary 每次重拉，导致「全部账本」与各账本 chip 数字不一致。
+           这里单独重拉账本统计并重绘切换条，保证口径一致。 */
+        async function refreshBookStat() {
+            try {
+                const month = monthOf();
+                const r = await apiGet('/api/ledger/books?stat=1&month=' + month);
+                if (r && r.code === 200 && r.data) { bookStat = r.data; books = (r.data.books) || []; renderBooks(); }
+            } catch (e) { /* 静默：loadAll 会兜底 */ }
+        }
+        function filterByBook(id) {
+            if (id === '__manage') return openBookModal();
+            curBookId = String(id) === String(curBookId) ? '' : id;
+            const sel = document.getElementById('filterBook');
+            sel.value = curBookId ? String(curBookId) : '';
+            loadAll();
+        }
+        /* 筛选下拉与顶部切换条是同一状态的两个入口，改一边要同步另一边 */
+        function onFilterBookChange() {
+            curBookId = document.getElementById('filterBook').value || '';
+            loadAll();
+        }
+        /* ---- 迭代 3：本月预算（80% 黄 / 100% 红）；超支时条纹满格 + 溢出徽标 ---- */
+        function bgBarHtml(percent, status) {
+            const w = Math.min(100, percent);
+            const over = status === 'over' && percent > 100;
+            const badge = over ? '<span class="bg-over-badge">+' + (percent - 100).toFixed(1) + '%</span>' : '';
+            return `<div class="bg-bar${over ? ' over' : ''}"><i class="${status}" style="width:${w}%"></i>${badge}</div>`;
+        }
+        function bgStatusTag(status, percent) {
+            if (status === 'over') return '<span class="bg-status over">超支 ' + percent + '%</span>';
+            if (status === 'warn') return '<span class="bg-status warn">已用 ' + percent + '%</span>';
+            return '<span class="bg-status ok">已用 ' + percent + '%</span>';
+        }
+        function renderBudgets() {
+            const box = document.getElementById('budgetBody');
+            const lbl = document.getElementById('budgetMonthLabel');
+            if (!box) return;
+            const month = monthOf();
+            if (lbl) lbl.textContent = month;
+            const bs = budgetStat;
+            if (!bs || !bs.budgets.length) {
+                box.innerHTML = '<div class="field-hint">本月还没设预算。设一个总预算或按分类预算，'
+                    + '用到 80% 变黄、100% 变红，超支会提醒到首页与每日晨报。'
+                    + '（点右上角「预算设置」）</div>';
+                return;
+            }
+            const row = b => `<div class="bg-row">
+                <div class="bg-top">
+                    <span class="bg-name">${normIcon(b.icon) || ''} ${escapeHtml(b.categoryName)}</span>
+                    ${bgStatusTag(b.status, b.percent)}
+                    <span class="bg-num"><b>${money(b.spent)}</b> / ${money(b.amount)}</span>
+                </div>
+                ${bgBarHtml(b.percent, b.status)}
+            </div>`;
+            let html = '';
+            if (bs.total) html += '<div class="bg-total">' + row(bs.total) + '</div>';
+            const cats = bs.budgets.filter(b => b.categoryId);
+            if (cats.length) html += '<div class="section-title" style="margin-bottom:8px;">分类预算</div>'
+                + cats.map(row).join('');
+            box.innerHTML = html;
+        }
+        function openBudgetModal() {
+            document.getElementById('budgetModalMonth').textContent = monthOf();
+            const sel = document.getElementById('newBudgetTarget');
+            const cur = sel.value;
+            sel.innerHTML = '<option value=""><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 总预算（全部支出）</option>'
+                + catTree.filter(c => c.kind === 'expense')
+                    .map(c => `<option value="${c.id}">${normIcon(c.icon) || ''} ${escapeHtml(c.name)}</option>`).join('');
+            if (cur) sel.value = cur;
+            renderBudgetManage();
+            openModal('budgetModal');
+        }
+        function renderBudgetManage() {
+            const box = document.getElementById('budgetManageList');
+            const bs = budgetStat;
+            if (!bs || !bs.budgets.length) {
+                box.innerHTML = '<div class="field-hint">本月还没有预算，在下方新建，或点「复制上月预算」。</div>';
+                return;
+            }
+            box.innerHTML = bs.budgets.map(b => `<div class="vault-item" style="padding:8px 10px;margin-bottom:6px;">
+                <div class="v-info">
+                    <div class="v-title" style="font-weight:400;">${normIcon(b.icon) || ''} ${escapeHtml(b.categoryName)}</div>
+                    <div class="field-hint">已用 ${money(b.spent)}（${b.percent}%）· ${b.status === 'over' ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg> 超支' : b.status === 'warn' ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/></svg> 接近上限' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/></svg> 正常'}</div>
+                </div>
+                <input type="number" id="bgAmt${b.id}" value="${b.amount}" min="0" step="0.01"
+                    style="width:110px;padding:4px 8px;font-size:13px;" title="修改金额后点 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> 保存">
+                <button class="icon-btn" onclick="saveBudgetAmount(${b.id})" title="保存金额"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>
+                <button class="icon-btn danger" onclick="removeBudget(${b.id})" title="删除预算"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            </div>`).join('');
+        }
+        async function addBudget() {
+            const target = document.getElementById('newBudgetTarget').value;
+            const amount = +document.getElementById('newBudgetAmount').value;
+            const r = await apiPost('/api/ledger/budgets', {
+                month: monthOf(),
+                categoryId: target ? +target : null,
+                amount
+            });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            document.getElementById('newBudgetAmount').value = '';
+            showToast('预算已保存'); await loadAll(); renderBudgetManage();
+        }
+        async function saveBudgetAmount(id) {
+            const v = +((document.getElementById('bgAmt' + id) || {}).value);
+            const r = await apiPut('/api/ledger/budgets/' + id, { amount: v });
+            if (r.code !== 200) return showToast(r.message || '更新失败', 'error');
+            showToast('已更新'); await loadAll(); renderBudgetManage();
+        }
+        async function removeBudget(id) {
+            const b = (budgetStat && budgetStat.budgets || []).find(x => x.id === id);
+            if (!(await confirmDel('确定删除「' + (b ? b.categoryName : '') + '」的本月预算吗？已记录的流水不受影响。'))) return;
+            const r = await apiDelete('/api/ledger/budgets/' + id);
+            if (r.code !== 200) return showToast(r.message || '删除失败', 'error');
+            showToast('已删除'); await loadAll(); renderBudgetManage();
+        }
+        async function copyLastMonthBudgets() {
+            const cur = monthOf();
+            const d = new Date(cur + '-01T00:00:00');
+            d.setMonth(d.getMonth() - 1);
+            const prev = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+            const r = await apiPost('/api/ledger/budgets/copy', { from: prev, to: cur });
+            if (r.code !== 200) return showToast(r.message || '复制失败', 'error');
+            showToast(r.message || '已复制'); await loadAll(); renderBudgetManage();
+        }
+        /* ---- 迭代 2：账本管理（增 / 改名 / 转移流水 / 删） ---- */
+        function openBookModal() { renderBookLists(); openModal('bookModal'); }
+        function renderBookLists() {
+            const box = document.getElementById('bookManageList');
+            const orphan = (bookStat && bookStat.orphanCount) || 0;
+            if (!books.length) { box.innerHTML = '<div class="field-hint">暂无账本</div>'; return; }
+            box.innerHTML = books.map(b => {
+                const st = b.stat || { expense: 0, income: 0, count: 0 };
+                return `<div class="vault-item" style="padding:8px 10px;margin-bottom:6px;">
+                <div class="v-info">
+                    <div class="v-title" style="font-weight:400;">${normIcon(b.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'} ${escapeHtml(b.name)}
+                        ${b.builtin ? '<span class="pill muted" style="font-size:12px;">预置</span>' : ''}</div>
+                    <div class="field-hint">本月支出 ${money(st.expense)} · 收入 ${money(st.income)} · ${st.count} 笔</div>
+                </div>
+                <button class="icon-btn" onclick="renameBook(${b.id})" title="重命名"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="icon-btn" onclick="moveBookRecords(${b.id})" title="把本账本流水转到其他账本"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg></button>
+                <button class="icon-btn danger" onclick="removeBook(${b.id})" title="删除账本"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            </div>`;
+            }).join('') + (orphan ? `<div class="field-hint" style="color:var(--warning);">有 ${orphan} 笔流水不属于任何账本（历史数据），新建账本后可在流水编辑里归入。</div>` : '');
+        }
+        async function addBook() {
+            const name = document.getElementById('newBookName').value.trim();
+            if (!name) return showToast('请输入账本名称', 'warning');
+            const r = await apiPost('/api/ledger/books', {
+                name,
+                kind: document.getElementById('newBookKind').value,
+                icon: document.getElementById('newBookIcon').value.trim() || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+                color: document.getElementById('newBookColor').value.trim() || '#3b82f6'
+            });
+            if (r.code !== 200) return showToast(r.message || '创建失败', 'error');
+            document.getElementById('newBookName').value = '';
+            document.getElementById('newBookIcon').value = '';
+            showToast('已创建账本'); await loadAll(); renderBookLists();
+        }
+        async function renameBook(id) {
+            const b = books.find(x => x.id === id); if (!b) return;
+            const v = window.prompt('账本名称', b.name);
+            if (v === null) return;
+            if (!String(v).trim()) return showToast('名称不能为空', 'warning');
+            const r = await apiPut('/api/ledger/books/' + id, { name: String(v).trim() });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            showToast('已重命名'); await loadAll(); renderBookLists();
+        }
+        async function moveBookRecords(fromId) {
+            const others = books.filter(b => b.id !== fromId);
+            if (!others.length) return showToast('没有其他账本可转移', 'warning');
+            const hint = '把该账本的流水转到哪个账本？\n' + others.map((b, i) => (i + 1) + '. ' + b.name).join('\n');
+            const v = window.prompt(hint, '1');
+            if (v === null) return;
+            const idx = +v - 1;
+            if (!others[idx]) return showToast('请输入列表中的序号', 'warning');
+            const r = await apiPost('/api/ledger/books/' + fromId + '/move', { toBookId: others[idx].id });
+            if (r.code !== 200) return showToast(r.message || '转移失败', 'error');
+            showToast(r.message || '已转移'); await loadAll(); renderBookLists();
+        }
+        async function removeBook(id) {
+            if (!(await confirmDel('确定删除该账本吗？有流水的账本无法删除。'))) return;
+            const r = await apiDelete('/api/ledger/books/' + id);
+            if (r.code !== 200) return showToast(r.message || '删除失败', 'error');
+            if (String(curBookId) === String(id)) curBookId = '';
+            showToast('已删除'); await loadAll(); renderBookLists();
+        }
+
+        /* ---- 迭代 1：净资产口径（余额一律由流水推导，见 /accounts/balances） ---- */
+        function renderNetWorth() {
+            const b = balances; if (!b) return;
+            document.getElementById('nwAsset').textContent = money(b.totalAssets);
+            document.getElementById('nwDebt').textContent = money(b.totalDebts);
+            const n = document.getElementById('nwNet');
+            n.textContent = moneySigned(b.netWorth);
+            n.className = 'nw-val ' + (b.netWorth >= 0 ? 'amount-income' : 'amount-expense');
+            document.getElementById('nwLedger').textContent = moneySigned(b.ledgerNetWorth);
+            const bits = [];
+            bits.push('账户口径：资产 ' + money(b.ledgerAssets) + ' − 负债 ' + money(b.ledgerDebts));
+            if (b.otherAssets) bits.push('其他资产 ' + money(b.otherAssets));
+            if (b.otherDebts) bits.push('其他负债 ' + money(b.otherDebts));
+            if (b.mortgageDebt) bits.push('房贷 ' + money(b.mortgageDebt));
+            if (b.unassignedRecords) bits.push('<span style="color:var(--warning);">' + b.unassignedRecords + ' 笔流水未指定账户（不计入任何账户余额）</span>');
+            document.getElementById('nwHint').innerHTML = bits.join(' · ');
+        }
+        function renderAccounts() {
+            const box = document.getElementById('accStrip');
+            if (!accounts.length) { box.innerHTML = ''; return; }
+            box.innerHTML = accounts.map(a => `<button type="button" class="acc-card${String(curAccFilter) === String(a.id) ? ' active' : ''}" onclick="filterByAccount(${a.id})" title="点击筛选该账户流水">
+                <span class="ac-top"><span class="ac-icon">${normIcon(a.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>'}</span><span class="ac-name">${escapeHtml(a.name)}</span></span>
+                <span class="ac-bal ${a.balance < 0 ? 'amount-expense' : ''}">${moneySigned(a.balance)}</span>
+                <span class="ac-delta">本月 ${a.monthDelta > 0 ? '+' : ''}${moneySigned(a.monthDelta)}</span>
+            </button>`).join('');
+        }
+        function filterByAccount(id) {
+            const sel = document.getElementById('filterAccount');
+            sel.value = String(sel.value) === String(id) ? '' : String(id);
+            loadAll();
+        }
+
+        function renderHero() {
+            const s = summary;
+            document.getElementById('hExpense').textContent = money(s.expense);
+            document.getElementById('hIncome').textContent = money(s.income);
+            const net = s.net;
+            const netEl = document.getElementById('hNet');
+            netEl.textContent = (net >= 0 ? '+' : '-') + money(Math.abs(net));
+            netEl.className = 'lh-value ' + (net >= 0 ? 'amount-income' : 'amount-expense');
+            document.getElementById('hCount').textContent = s.count;
+            document.getElementById('hExpenseSub').textContent = `手记 ${money(s.manualExpense)} · 人情 ${money(s.giftExpense)}`;
+            document.getElementById('hIncomeSub').textContent = `手记 ${money(s.manualIncome)} · 人情 ${money(s.giftIncome)}`;
+            document.getElementById('hNetSub').textContent = !s.count ? '本月暂无记录' : (net >= 0 ? '本月有结余' : '本月超支');
+            document.getElementById('hCountSub').textContent = `其中人情往来 ${s.giftCount} 笔（自动汇入）`;
+            document.getElementById('catMonthLabel').textContent = monthOf() + ' · 共 ' + money(s.expense);
+        }
+        function renderCats() {
+            const box = document.getElementById('expenseCats');
+            const rows = (summary.byCategory && summary.byCategory.expense) || [];
+            renderRing(rows);
+            if (!rows.length) { box.innerHTML = '<div class="cockpit-empty">本月暂无支出记录</div>'; return; }
+            /* 迭代 2：有二级金额的一级行可点开下钻（验收：报表能下钻到二级） */
+            box.innerHTML = rows.map(r => {
+                const kids = r.children || [];
+                const open = !!expandedCats[r.id];
+                const head = `<div class="cat-row${kids.length ? ' has-kids' : ''}"${kids.length ? ` onclick="toggleCatExpand('${r.id}')" title="点击${open ? '收起' : '展开'}二级明细"` : ''}>
+                    <span class="cr-name">${normIcon(r.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'} ${escapeHtml(r.name)}${r.auto ? ' <span class="pill muted" style="font-size:12px;">自动</span>' : ''}${kids.length ? '<span class="cr-caret">' + (open ? '▾' : '▸') + '</span>' : ''}</span>
+                    <span class="cr-bar"><i style="width:${Math.max(2, r.percent)}%"></i></span>
+                    <span class="cr-val">${money(r.amount)} · ${r.percent}%</span>
+                </div>`;
+                if (!kids.length || !open) return head;
+                return head + '<div class="cat-kids">' + kids.map(k => `<div class="cat-kid">
+                    <span class="ck-name">${normIcon(k.icon) || ''} ${escapeHtml(k.name)}</span>
+                    <span class="ck-bar"><i style="width:${Math.max(3, k.percent)}%"></i></span>
+                    <span class="ck-val">${money(k.amount)}</span></div>`).join('') + '</div>';
+            }).join('');
+        }
+        function toggleCatExpand(id) {
+            expandedCats[id] = !expandedCats[id];
+            renderCats();
+        }
+        /* P2⑥ 支出构成环形图：用与列表同一份 byCategory 数据画 SVG 环形占比，钱花在哪类一眼可见 */
+        const RING_PALETTE = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#78716c', '#94a3b8'];
+        function renderRing(rows) {
+            const el = document.getElementById('catRing');
+            if (!el) return;
+            if (!rows || !rows.length) { el.innerHTML = ''; return; }
+            const R = 70, C = 2 * Math.PI * R, cx = 80, cy = 80;
+            const total = rows.reduce((s, r) => s + (+r.amount || 0), 0) || 1;
+            let offset = 0;
+            const segs = rows.map((r, i) => {
+                const pct = Math.min(100, Math.max(0, r.percent || 0));
+                const len = pct / 100 * C;
+                const seg = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${RING_PALETTE[i % RING_PALETTE.length]}" stroke-width="22"
+                    stroke-dasharray="${len.toFixed(1)} ${(C - len).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}"
+                    transform="rotate(-90 ${cx} ${cy})"><title>${escapeHtml(r.name)} ${money(r.amount)} · ${pct}%</title></circle>`;
+                offset += len;
+                return seg;
+            }).join('');
+            el.innerHTML = `<svg viewBox="0 0 160 160" width="152" height="152" role="img" aria-label="本月支出分类占比环形图" style="display:block;margin:0 auto 12px;">
+                <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="var(--bg-inset)" stroke-width="22"/>
+                ${segs}
+                <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-primary)">${money(total)}</text>
+                <text x="${cx}" y="${cy + 15}" text-anchor="middle" font-size="11" fill="var(--text-secondary)">本月支出</text>
+            </svg>`;
+        }
+        function renderTrend(list) {
+            const box = document.getElementById('trendChart');
+            /* 趋势固定以本月为锚（服务端口径）：筛选历史月份时明示，避免误读为筛选月的数据 */
+            const ah = document.getElementById('trendAnchorHint');
+            if (ah) ah.style.display = (monthOf() !== todayStr().slice(0, 7)) ? '' : 'none';
+            if (!list.length) { box.innerHTML = '<div class="cockpit-empty">暂无数据</div>'; return; }
+            const max = Math.max(...list.map(x => Math.max(x.expense, x.income)), 1);
+            box.innerHTML = list.map(x => `<div class="trend-col" title="${x.month} 支出 ${money(x.expense)} / 收入 ${money(x.income)}">
+                <div class="trend-bars">
+                    <i class="exp" style="height:${Math.max(2, x.expense / max * 100)}%;"></i>
+                    <i class="inc" style="height:${Math.max(2, x.income / max * 100)}%;"></i>
+                </div>
+                <div class="trend-label">${+x.month.slice(5)}月</div>
+            </div>`).join('');
+        }
+        function renderFilters() {
+            const kind = document.getElementById('filterKind').value;
+            /* 分类筛选：一级用 optgroup 分组，二级缩进显示（迭代 2 可筛到二级） */
+            const catSel = document.getElementById('filterCategory');
+            const curCat = catSel.value;
+            const opts = [];
+            catTree.filter(p => !kind || p.kind === kind).forEach(p => {
+                opts.push(`<option value="${p.id}">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}（全部）</option>`);
+                p.children.forEach(c => opts.push(`<option value="${c.id}">　└ ${escapeHtml(c.name)}</option>`));
+            });
+            catSel.innerHTML = '<option value="">全部分类</option>' + opts.join('');
+            if (curCat) catSel.value = curCat;
+            /* 账本筛选（迭代 2） */
+            const bSel = document.getElementById('filterBook');
+            const curB = curBookId || bSel.value;
+            bSel.innerHTML = '<option value="">全部账本</option>' + books.map(b => `<option value="${b.id}">${normIcon(b.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'} ${escapeHtml(b.name)}</option>`).join('');
+            if (curB) bSel.value = String(curB);
+            const mSel = document.getElementById('filterMember');
+            const curM = mSel.value;
+            mSel.innerHTML = '<option value="">全部家人</option>' + members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+            if (curM) mSel.value = curM;
+            /* 账户：筛选器 + 弹窗（所属账户 / 转出 / 转入） */
+            const aSel = document.getElementById('filterAccount');
+            const curA = aSel.value;
+            aSel.innerHTML = '<option value="">全部账户</option>' + accounts.map(a => `<option value="${a.id}">${normIcon(a.icon) || ''} ${escapeHtml(a.name)}</option>`).join('');
+            if (curA) aSel.value = curA;
+            const accOpts = accounts.map(a => `<option value="${a.id}">${normIcon(a.icon) || ''} ${escapeHtml(a.name)}</option>`).join('');
+            const lAcc = document.getElementById('lAccount');
+            const keepAcc = lAcc.value;
+            lAcc.innerHTML = '<option value="">未指定账户</option>' + accOpts;
+            if (keepAcc) lAcc.value = keepAcc;
+            document.getElementById('lFromAccount').innerHTML = accOpts || '<option value="">（请先创建账户）</option>';
+            document.getElementById('lToAccount').innerHTML = accOpts || '<option value="">（请先创建账户）</option>';
+            /* 账本选择（记一笔 / 编辑）：始终提供「日常账本」为默认，避免无归属流水 */
+            const lBook = document.getElementById('lBook');
+            const keepBook = lBook.value;
+            lBook.innerHTML = books.map(b => `<option value="${b.id}">${normIcon(b.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'} ${escapeHtml(b.name)}</option>`).join('');
+            if (keepBook && [...lBook.options].some(o => o.value === keepBook)) lBook.value = keepBook;
+            else if (bookStat && bookStat.defaultBookId) lBook.value = String(bookStat.defaultBookId);
+            else if (curBookId) lBook.value = String(curBookId);
+            // 弹窗选择
+            document.getElementById('lMember').innerHTML = '<option value="">不关联</option>' + members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+            renderCategoryOptions();
+            const monthInput = document.getElementById('filterMonth');
+            if (!monthInput.value) monthInput.value = monthOf();
+        }
+
+        /* ---- 迭代 2：二级分类宫格 ----
+           #lCategory 仍是唯一取值源（editRecord / 语音填单 / 「上次分类」都写它），
+           宫格只是它的可视化选择器：改宫格 → 写 select；改 select → 回读宫格（onchange 已挂）。 */
+        function catById(id) { return categories.find(c => String(c.id) === String(id)) || null; }
+        function selectedCat() { return catById(document.getElementById('lCategory').value); }
+        function syncCatPickerFromSelect() {
+            const c = selectedCat();
+            curCatParent = c ? (c.parentId ? catById(c.parentId) : c) : null;
+        }
+        function pickCat(id) {
+            document.getElementById('lCategory').value = id ? String(id) : '';
+            syncCatPickerFromSelect();
+            renderCatPicker();
+        }
+        function toggleCatKids(id) { expandedCats[id] = !expandedCats[id]; renderCatPicker(); }
+        function renderCatPicker() {
+            const box = document.getElementById('catPicker');
+            if (!box) return;
+            const kind = document.getElementById('lKind').value;
+            const roots = catTree.filter(c => c.kind === kind);
+            const sel = selectedCat();
+            const activeParentId = sel ? (sel.parentId || sel.id) : null;
+            const selLabel = sel
+                ? ((sel.icon || '') + ' ' + escapeHtml(sel.parentId ? (catById(sel.parentId) || {}).name + ' / ' + sel.name : sel.name))
+                : '未分类（不指定分类）';
+            let html = '<div class="cp-selected">已选：<b>' + selLabel + '</b></div>';
+            html += '<div class="cp-row">' + roots.map(p => `<button type="button"
+                class="cp-chip${String(activeParentId) === String(p.id) ? ' on' : ''}"
+                onclick="pickCat(${p.id})">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}</button>`).join('') + '</div>';
+            const ap = activeParentId ? catById(activeParentId) : null;
+            if (ap) {
+                const kids = catTree.filter(c => c.id === ap.id)[0];
+                const list = kids ? kids.children : [];
+                if (list.length) {
+                    html += '<div class="cp-kids"><div class="cp-row">'
+                        + `<span class="cp-label">细分类：</span>`
+                        + `<button type="button" class="cp-chip child${String(document.getElementById('lCategory').value) === String(ap.id) ? ' on' : ''}"
+                            onclick="pickCat(${ap.id})">只记到「${escapeHtml(ap.name)}」</button>`
+                        + list.map(k => `<button type="button" class="cp-chip child${String(document.getElementById('lCategory').value) === String(k.id) ? ' on' : ''}"
+                            onclick="pickCat(${k.id})">${normIcon(k.icon) || ''} ${escapeHtml(k.name)}</button>`).join('')
+                        + '</div></div>';
+                }
+            }
+            box.innerHTML = html;
+        }
+
+        /* ---- 迭代 1：支出 / 收入 / 转账 三态切换 ---- */
+        function setRecordKind(kind) {
+            if (kind !== 'income' && kind !== 'transfer') kind = 'expense';
+            document.getElementById('lKind').value = kind;
+            [...document.getElementById('lKindTabs').querySelectorAll('.seg-tab')]
+                .forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
+            const isTr = kind === 'transfer';
+            document.getElementById('rowNormal').style.display = isTr ? 'none' : '';
+            document.getElementById('rowNormal2').style.display = isTr ? 'none' : '';
+            document.getElementById('rowNormal3').style.display = isTr ? 'none' : '';
+            document.getElementById('rowTransfer').style.display = isTr ? '' : 'none';
+            document.getElementById('trHint').style.display = isTr ? '' : 'none';
+            if (!isTr) { renderCategoryOptions(); syncCatPickerFromSelect(); renderCatPicker(); }
+        }
+        function accountName(id) { const a = accounts.find(x => x.id === id); return a ? a.name : ''; }
+        function accountLabel(id) { const a = accounts.find(x => x.id === id); return a ? ((a.icon || '') + ' ' + a.name) : ''; }
+        function rememberAccount() {
+            try { localStorage.setItem('ledgerLastAccount', document.getElementById('lAccount').value || ''); } catch (e) { }
+        }
+        function applyRememberedAccount() {
+            let last = '';
+            try { last = localStorage.getItem('ledgerLastAccount') || ''; } catch (e) { }
+            const sel = document.getElementById('lAccount');
+            if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
+        }
+        function renderCategoryOptions() {
+            const kind = document.getElementById('lKind').value;
+            const sel = document.getElementById('lCategory');
+            const keep = sel.value;
+            /* 一级用 optgroup 分组，二级缩进；一级本身也可选（只记到一级） */
+            const groups = catTree.filter(p => p.kind === kind).map(p => {
+                const kids = p.children.map(c => `<option value="${c.id}">　└ ${escapeHtml(c.name)}</option>`).join('');
+                return `<optgroup label="${escapeHtml(p.name)}">`
+                    + `<option value="${p.id}">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}（全部）</option>${kids}</optgroup>`;
+            }).join('');
+            sel.innerHTML = '<option value="">（未分类）</option>' + groups;
+            if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+            /* 记一笔打开时应用「上次分类」（分类列表可能在异步加载后才有内容，统一在这里兜底应用） */
+            if (lastCatPending) {
+                lastCatPending = false;
+                const last = localStorage.getItem('ledgerLastCat') || '';
+                if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
+            }
+        }
+        function memberName(id) { const m = members.find(x => x.id === id); return m ? m.name : ''; }
+        function memberAvatarFor(id) { const m = members.find(x => x.id === id); return (window.memberAvatarHtml && m) ? memberAvatarHtml(m) : ''; }
+
+        /* 合并展示：手动账目 + 人情往来（只读） */
+        function mergedRows() {
+            const kindFilter = document.getElementById('filterKind').value;
+            const catFilter = document.getElementById('filterCategory').value;
+            const memFilter = document.getElementById('filterMember').value;
+            const accFilter = document.getElementById('filterAccount').value;
+            const rows = records.map(r => {
+                const isTr = r.kind === 'transfer';
+                const c = catById(r.categoryId);
+                /* 二级分类显示「一级 / 二级」全路径，避免「午餐」孤零零看不出归属 */
+                const parent = c && c.parentId ? catById(c.parentId) : null;
+                const bk = books.find(b => b.id === r.bookId);
+                return {
+                    id: r.id, date: r.date, kind: r.kind, amount: r.amount,
+                    catName: isTr
+                        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> ' + (accountLabel(r.accountId) || '未指定') + ' → ' + (accountLabel(r.toAccountId) || '未指定')
+                        : (c ? ((parent ? (parent.icon || '') + ' ' + escapeHtml(parent.name) + ' / ' : (c.icon || '') + ' ') + escapeHtml(c.name)) : '未分类'),
+                    /* catText/bookText：导出 CSV 用的纯文本口径（catName/bookName 里拼的是展示用 SVG/emoji） */
+                    catText: isTr
+                        ? (accountLabel(r.accountId) || '未指定') + ' → ' + (accountLabel(r.toAccountId) || '未指定')
+                        : (c ? (parent ? parent.name + ' / ' + c.name : c.name) : '未分类'),
+                    bookText: bk ? bk.name : '',
+                    accName: isTr
+                        ? (accountLabel(r.accountId) || '') + ' → ' + (accountLabel(r.toAccountId) || '')
+                        : (accountLabel(r.accountId) || ''),
+                    bookName: bk ? ((bk.icon || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>') + ' ' + escapeHtml(bk.name)) : '',
+                    method: r.method || '', memberId: r.memberId, remark: r.remark || '',
+                    isTransfer: isTr, src: 'manual', auto: false
+                };
+            });
+            /* 人情往来是家庭级数据、不属于任何账本与账户，所以只在「全账本 + 无分类/家人/账户筛选」时并入，
+               与后端 ledgerSummaryOf 在 bookId 作用域下排除人情的口径保持一致。 */
+            if (!catFilter && !memFilter && !curBookId && !accFilter) {
+                gifts.forEach(g => rows.push({
+                    id: 'g' + g.id, date: g.date,
+                    kind: g.direction === 'in' ? 'income' : 'expense',
+                    amount: g.amount, catName: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></svg> 人情往来',
+                    catText: '人情往来', bookText: '人情往来',
+                    method: g.eventType || '', memberId: g.memberId || null,
+                    remark: g.remark || '', src: 'gift', auto: true
+                }));
+            }
+            return rows.filter(r => !kindFilter || r.kind === kindFilter)
+                .sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.id).localeCompare(String(a.id)));
+        }
+        function renderRecords() {
+            const box = document.getElementById('recordsWrap');
+            const rows = mergedRows();
+            if (!rows.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({
+                    size: 'block',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+                    title: '本月暂无账目', text: '记录每天的开销与收入，月底自动汇总分类占比',
+                    action: { text: '记第一笔', onClick: function () { openRecordModal(); } }
+                }));
+                return;
+            }
+            const income = rows.filter(r => r.kind === 'income').reduce((s, r) => s + (+r.amount || 0), 0);
+            const expense = rows.filter(r => r.kind === 'expense').reduce((s, r) => s + (+r.amount || 0), 0);
+            const transferCount = rows.filter(r => r.kind === 'transfer').length;
+            box.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>'
+                + '<th>日期</th><th>类型</th><th>分类</th><th class="hide-xs">账本</th><th>金额</th><th class="hide-xs">账户</th><th class="hide-xs">家人</th><th class="hide-xs">备注</th><th style="width:90px;">操作</th>'
+                + '</tr></thead><tbody>' + rows.map(r => `<tr>
+                    <td>${r.date}</td>
+                    <td>${r.kind === 'income'
+                        ? '<span class="status-tag" style="background:rgba(220,38,38,.10);color:var(--amount-in);">收入</span>'
+                        : r.kind === 'transfer'
+                            ? '<span class="status-tag" style="background:var(--bg-inset);color:var(--text-secondary);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg> 转账</span>'
+                            : '<span class="status-tag" style="background:rgba(22,163,74,.12);color:var(--amount-out);">支出</span>'}</td>
+                    <td>${r.catName}${r.auto ? ' <span class="pill muted" style="font-size:12px;">自动</span>' : ''}</td>
+                    <td class="hide-xs">${r.bookName || '—'}</td>
+                    <td class="${r.kind === 'income' ? 'amount-income' : r.kind === 'expense' ? 'amount-expense' : ''}">${r.kind === 'income' ? '+' : r.kind === 'expense' ? '-' : ''}${money(r.amount)}</td>
+                    <td class="hide-xs">${escapeHtml(r.accName || r.method || '—')}</td>
+                    <td class="hide-xs">${memberAvatarFor(r.memberId)} ${escapeHtml(memberName(r.memberId) || '—')}</td>
+                    <td class="hide-xs" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.remark || '')}</td>
+                    <td>${r.auto
+                        ? '<a class="icon-btn" title="去人情记账修改" href="/gift-records"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg></a>'
+                        : `<button class="icon-btn" title="编辑这笔" aria-label="编辑这笔" onclick="editRecord(${r.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button><button class="icon-btn danger" title="删除这笔" aria-label="删除这笔" onclick="removeRecord(${r.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>`}</td>
+                </tr>`).join('') + '</tbody></table></div>'
+                + `<div class="field-hint">本页合计：收入 ${money(income)} · 支出 ${money(expense)} · 结余 ${moneySigned(income - expense)}`
+                + (transferCount ? ` · 另有 ${transferCount} 笔转账（不计收支）` : '') + '</div>';
+        }
+
+        /* --- 记账 CRUD --- */
+        /* 语音 AI 记账：接收解析结果自动填单 */
+        window.applyVoiceFill = function (kind, data) {
+            if (kind !== 'ledger' || !data) return;
+            if (data.kind === 'income' || data.kind === 'expense') setRecordKind(data.kind);
+            if (data.amount) document.getElementById('lAmount').value = Math.abs(+data.amount).toFixed(2);
+            if (data.date) document.getElementById('lDate').value = data.date;
+            if (data.remark) document.getElementById('lRemark').value = String(data.remark).slice(0, 100);
+            if (data.category) {
+                renderCategoryOptions();
+                const kw = String(data.category);
+                /* 优先匹配二级名称（「午餐」比「餐饮」更精确），命中后同步宫格 */
+                const kids = categories.filter(c => c.parentId);
+                const cat = kids.find(c => kw.indexOf(c.name) >= 0 || c.name.indexOf(kw) >= 0)
+                    || categories.find(c => kw.indexOf(c.name) >= 0 || c.name.indexOf(kw) >= 0);
+                if (cat) {
+                    document.getElementById('lCategory').value = cat.id;
+                    syncCatPickerFromSelect(); renderCatPicker();
+                }
+            }
+            showToast('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> 已按语音填写，请确认后保存');
+        };
+        let lastCatPending = false;
+        function openRecordModal() {
+            /* 迭代 4：窄屏改走底部抽屉两步流（屏 2/3），避免 8 字段长表单 + 系统键盘遮挡 */
+            if (isNarrow()) return qdOpen(null);
+            editingId = null;
+            lastCatPending = true;
+            document.getElementById('recordModalTitle').textContent = '记一笔';
+            document.getElementById('lAmount').value = '';
+            document.getElementById('lDate').value = todayStr();
+            document.getElementById('lMethod').value = '';
+            document.getElementById('lMember').value = '';
+            document.getElementById('lRemark').value = '';
+            /* setRecordKind 内部会调 renderCategoryOptions()，在那里应用「上次分类」 */
+            setRecordKind('expense');
+            /* 转账默认值：从第一个账户转到第二个，避免开局就撞上「不能是同一个」 */
+            const fromSel = document.getElementById('lFromAccount'), toSel = document.getElementById('lToAccount');
+            if (accounts.length) {
+                fromSel.value = String(accounts[0].id);
+                toSel.value = String((accounts[1] || accounts[0]).id);
+            }
+            /* 效率细节：记住上次使用的分类与账户，减少重复选择 */
+            applyRememberedAccount();
+            /* 正在看某个账本时，新账默认记进那个账本（避免记完才发现记错册） */
+            const lBook = document.getElementById('lBook');
+            if (curBookId && [...lBook.options].some(o => o.value === String(curBookId))) lBook.value = String(curBookId);
+            syncCatPickerFromSelect(); renderCatPicker();
+            openModal('recordModal');
+            /* P1-XX：新增记账默认日期=今天（value 已在上面设置）。注：Chrome 对曾处于 display:none
+               的 date input 存在渲染 bug——value 正确但弹窗打开瞬间显示占位，需点击日期框才显示今天；
+               JS 派发 untrusted 事件无法触发 UA 刷新，已尝试多种方案均无效（纯浏览器限制，不影响保存）。 */
+        }
+        /* --- 票据速记（拍照 → AI 识别 → 入账） --- */
+        function openReceiptModal() {
+            document.getElementById('rptStepPick').style.display = 'block';
+            document.getElementById('rptStepForm').style.display = 'none';
+            document.getElementById('rptPreview').style.display = 'none';
+            document.getElementById('rptFile').value = '';
+            document.getElementById('rptParseBtn').disabled = true;
+            document.getElementById('rptError').style.display = 'none';
+            const rw = document.getElementById('rptWarn'); if (rw) rw.style.display = 'none';
+            document.getElementById('rptDate').value = todayStr();
+            document.getElementById('rptMethod').value = '';
+            document.getElementById('rptRemark').value = '';
+            document.getElementById('rptModel').textContent = '--';
+            const kind = 'expense';
+            document.getElementById('rptCategory').innerHTML = '<option value="">（未分类）</option>' + categories
+                .filter(c => c.kind === kind).map(c => `<option value="${c.id}">${normIcon(c.icon) || ''} ${escapeHtml(c.name)}</option>`).join('');
+            document.getElementById('rptMember').innerHTML = '<option value="">不关联</option>' + members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+            openModal('receiptModal');
+        }
+        // 手机端选图后先压缩：长边≤1600px，逐步降质量直到 dataURL ≤~5MB，避免大图上传截断损坏
+        function compressImageFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const orig = e.target.result;
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const MAX = 1600;
+                            const w = img.naturalWidth, h = img.naturalHeight;
+                            const longEdge = Math.max(w, h);
+                            const scale = longEdge > MAX ? MAX / longEdge : 1;
+                            const cw = Math.max(1, Math.round(w * scale));
+                            const ch = Math.max(1, Math.round(h * scale));
+                            const canvas = document.createElement('canvas');
+                            canvas.width = cw; canvas.height = ch;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, cw, ch);
+                            let q = 0.85;
+                            let out = canvas.toDataURL('image/jpeg', q);
+                            // base64 约比二进制大 4/3，5MB 文件对应 dataURL ~6.7M 字符
+                            while (out.length > 6.5 * 1024 * 1024 && q > 0.4) {
+                                q -= 0.15;
+                                out = canvas.toDataURL('image/jpeg', q);
+                            }
+                            resolve(out);
+                        } catch (err) { resolve(orig); }
+                    };
+                    img.onerror = () => resolve(orig);
+                    img.src = orig;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        async function onRptFile() {
+            const f = document.getElementById('rptFile').files[0]; if (!f) return;
+            const img = document.getElementById('rptPreview');
+            const err = document.getElementById('rptError');
+            err.style.display = 'none';
+            // 先压缩再预览/上传
+            try {
+                const dataUrl = await compressImageFile(f);
+                img.src = dataUrl; img.style.display = 'block';
+                document.getElementById('rptParseBtn').disabled = false;
+            } catch (e) {
+                err.textContent = '图片读取失败，请重试'; err.style.display = 'block';
+            }
+        }
+        async function parseReceipt() {
+            const img = document.getElementById('rptPreview');
+            if (!img.src || img.src.indexOf('data:') !== 0) { alert('请先选择票据图片'); return; }
+            const btn = document.getElementById('rptParseBtn');
+            const err = document.getElementById('rptError');
+            btn.disabled = true; btn.textContent = '识别中…'; err.style.display = 'none';
+            try {
+                const r = await apiPost('/api/ai/receipt-parse', {
+                    imageDataUrl: img.src,
+                    categories: categories.filter(c => c.kind === 'expense').map(c => c.name)
+                });
+                if (r.code !== 200) { err.textContent = r.message || '识别失败'; err.style.display = 'block'; btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI 识别票据'; return; }
+                const f = r.data.fields || {};
+                document.getElementById('rptAmount').value = f.amount > 0 ? f.amount : '';
+                document.getElementById('rptDate').value = f.date || todayStr();
+                document.getElementById('rptMethod').value = f.method || '';
+                document.getElementById('rptRemark').value = f.remark || '';
+                const catSel = document.getElementById('rptCategory');
+                const kw = String(f.categoryName || '');
+                const match = categories.find(c => c.kind === 'expense' && (c.name === kw || (kw && c.name.indexOf(kw) >= 0) || (kw && kw.indexOf(c.name) >= 0)));
+                if (match) catSel.value = match.id;
+                document.getElementById('rptModel').textContent = (r.data.provider || '') + ' · ' + (r.data.model || '');
+                // 识别失败特征：金额为 0 且未识别出分类 → 明确提示手动填写（不再静默空表单）
+                const gotNothing = !(+f.amount > 0) && !kw.trim();
+                const warnEl = document.getElementById('rptWarn');
+                if (warnEl) {
+                    if (gotNothing) { warnEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 没识别出票据内容，请手动填写'; warnEl.style.display = 'block'; }
+                    else { warnEl.style.display = 'none'; }
+                }
+                document.getElementById('rptStepPick').style.display = 'none';
+                document.getElementById('rptStepForm').style.display = 'block';
+            } catch (e) {
+                err.textContent = '识别失败：' + (e && e.message ? e.message : e); err.style.display = 'block';
+                btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI 识别票据';
+            }
+        }
+        async function saveReceipt() {
+            const amount = document.getElementById('rptAmount').value;
+            const date = document.getElementById('rptDate').value;
+            if (!amount || +amount <= 0) { alert('请填写金额'); return; }
+            const data = {
+                date, kind: 'expense',
+                categoryId: document.getElementById('rptCategory').value || null,
+                amount: +amount,
+                method: document.getElementById('rptMethod').value,
+                memberId: document.getElementById('rptMember').value || null,
+                remark: document.getElementById('rptRemark').value.trim() || ''
+            };
+            const r = await apiPost('/api/ledger/records', data);
+            if (r.code !== 200) { alert(r.message || '保存失败'); return; }
+            closeModal('receiptModal');
+            await loadAll(); refreshBookStat();
+        }
+        function editRecord(id) {
+            const r = records.find(x => x.id === id);
+            if (!r) return;
+            /* 迭代 4：窄屏编辑也走抽屉，预填原值 */
+            if (isNarrow()) return qdOpen(r);
+            editingId = id;
+            document.getElementById('recordModalTitle').textContent = '编辑账目';
+            setRecordKind(r.kind);
+            renderCategoryOptions();
+            document.getElementById('lAmount').value = r.amount;
+            document.getElementById('lDate').value = r.date;
+            document.getElementById('lCategory').value = r.categoryId || '';
+            syncCatPickerFromSelect(); renderCatPicker();
+            document.getElementById('lAccount').value = r.accountId ? String(r.accountId) : '';
+            document.getElementById('lFromAccount').value = r.accountId ? String(r.accountId) : '';
+            document.getElementById('lToAccount').value = r.toAccountId ? String(r.toAccountId) : '';
+            if (r.bookId && [...document.getElementById('lBook').options].some(o => o.value === String(r.bookId))) {
+                document.getElementById('lBook').value = String(r.bookId);
+            }
+            document.getElementById('lMethod').value = r.method || '';
+            document.getElementById('lMember').value = r.memberId || '';
+            document.getElementById('lRemark').value = r.remark || '';
+            openModal('recordModal');
+            /* P1-XX：编辑记录日期已赋值（r.date）。Chrome 对曾处于 display:none 的 date input
+               显示瞬间可能有占位渲染 bug，点击日期框即显示正确日期，不影响保存。 */
+        }
+        async function saveRecord() {
+            const kind = document.getElementById('lKind').value;
+            const data = {
+                kind,
+                amount: +document.getElementById('lAmount').value,
+                date: document.getElementById('lDate').value,
+                categoryId: document.getElementById('lCategory').value || null,
+                method: document.getElementById('lMethod').value,
+                memberId: document.getElementById('lMember').value || null,
+                remark: document.getElementById('lRemark').value,
+                /* 迭代 2：归属账本（记账时就分册，避免事后一条条改） */
+                bookId: document.getElementById('lBook').value || null
+            };
+            if (kind === 'transfer') {
+                data.accountId = document.getElementById('lFromAccount').value || null;
+                data.toAccountId = document.getElementById('lToAccount').value || null;
+                data.categoryId = null;
+                if (!data.accountId || !data.toAccountId) return showToast('请选择转出与转入账户', 'warning');
+                if (String(data.accountId) === String(data.toAccountId)) return showToast('转出与转入账户不能相同', 'warning');
+            } else {
+                const acc = document.getElementById('lAccount').value;
+                data.accountId = acc || null;
+            }
+            if (!data.amount || data.amount <= 0 || !data.date) return showToast('金额和日期不能为空', 'warning');
+            const r = editingId ? await apiPut('/api/ledger/records/' + editingId, data) : await apiPost('/api/ledger/records', data);
+            if (r.code === 200) {
+                try {
+                    if (kind !== 'transfer') {
+                        localStorage.setItem('ledgerLastCat', document.getElementById('lCategory').value || '');
+                        /* 迭代 4：按类型分别记忆「上次分类」，抽屉键盘快捷键用（旧键兜底兼容） */
+                        try { localStorage.setItem('ledgerLastCat_' + kind, document.getElementById('lCategory').value || ''); } catch (e) { }
+                        localStorage.setItem('ledgerLastAccount', document.getElementById('lAccount').value || '');
+                    }
+                } catch (e) { }
+                showToast(kind === 'transfer' ? '已记录转账（不计收支）' : '已保存');
+                closeModal('recordModal'); await loadAll(); refreshBookStat();
+            }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function removeRecord(id) {
+            if (!(await confirmDel('确定删除这笔账目吗？'))) return;
+            const r = await apiDelete('/api/ledger/records/' + id);
+            if (r.code === 200) { showToast('已删除'); await loadAll(); refreshBookStat(); }
+            else showToast(r.message || '删除失败', 'error');
+        }
+
+        /* ==== 迭代 4：移动端记账抽屉（屏 2 金额键盘 / 屏 3 分类账户 / 屏 4 转账） ====
+           抽屉只维护自己的输入状态，保存时写进 #recordModal 表单字段并复用 saveRecord()，
+           校验 / localStorage 记忆 / 刷新全部走同一条路径，不在抽屉里重造第二套。 */
+        const qdState = { step: 1, amt: '', kind: 'expense', catId: null, accId: null, fromId: null, toId: null, editingId: null };
+        function isNarrow() { return window.matchMedia('(max-width:768px)').matches; }
+        function qdAmtText() { return qdState.amt || '0.00'; }
+        function qdRenderAmt() {
+            const n = document.getElementById('qdNum');
+            n.textContent = qdAmtText();
+            n.classList.toggle('empty', qdState.amt.length === 0);
+        }
+        function qdCatLabel(id) {
+            const c = catById(id); if (!c) return '';
+            const p = c.parentId ? catById(c.parentId) : null;
+            return (p ? p.name + ' / ' : '') + c.name;
+        }
+        /* 「上次分类」：优先按类型记忆的新键，回落到旧的单键（需校验类型一致才可用） */
+        function qdLastCat(kind) {
+            let v = '';
+            try { v = localStorage.getItem('ledgerLastCat_' + kind) || localStorage.getItem('ledgerLastCat') || ''; } catch (e) { }
+            const c = catById(v);
+            return (c && c.kind === kind) ? c : null;
+        }
+        function qdRefreshLastKey() {
+            const key = document.getElementById('qdLastKey'), lbl = document.getElementById('qdLastLbl');
+            const c = qdState.kind === 'transfer' ? null : qdLastCat(qdState.kind);
+            if (!c) { key.disabled = true; lbl.textContent = '分类'; }
+            else { key.disabled = false; lbl.textContent = (c.icon || '') + c.name; }
+        }
+        function qdOpen(rec) {
+            qdState.step = 1; qdState.amt = ''; qdState.editingId = rec ? rec.id : null;
+            qdState.kind = rec ? (rec.kind || 'expense') : 'expense';
+            qdState.catId = rec && rec.kind !== 'transfer' ? (rec.categoryId || null) : null;
+            qdState.accId = rec && rec.kind !== 'transfer' ? (rec.accountId || null) : null;
+            qdState.fromId = rec ? (rec.accountId || null) : null;
+            qdState.toId = rec ? (rec.toAccountId || null) : null;
+            if (rec) qdState.amt = String(Math.abs(+rec.amount || 0)) || '';
+            else if (accounts.length) { qdState.fromId = accounts[0].id; qdState.toId = (accounts[1] || accounts[0]).id; }
+            document.getElementById('qdTitle').textContent = rec ? '编辑账目' : '记一笔';
+            document.getElementById('qdRemark').value = rec ? (rec.remark || '') : '';
+            document.getElementById('qdDate').value = rec ? (rec.date || todayStr()) : todayStr();
+            document.getElementById('qdAccHint').style.display = 'none';
+            [...document.getElementById('qdTabs').querySelectorAll('.seg-tab')]
+                .forEach(b => b.classList.toggle('active', b.dataset.kind === qdState.kind));
+            qdRenderAmt(); qdRefreshLastKey(); qdShowStep(1);
+            openModal('quickDrawer');
+        }
+        function closeQuickDrawer() { closeModal('quickDrawer'); }
+        function qdSetKind(kind) {
+            if (kind !== 'income' && kind !== 'transfer') kind = 'expense';
+            qdState.kind = kind; qdState.catId = null;
+            [...document.getElementById('qdTabs').querySelectorAll('.seg-tab')]
+                .forEach(b => b.classList.toggle('active', b.dataset.kind === kind));
+            qdRefreshLastKey();
+            if (qdState.step === 2) qdShowStep(1); else qdRenderAmt();
+        }
+        function qdShowStep(n) {
+            qdState.step = n;
+            document.getElementById('qdStep1').style.display = n === 1 ? '' : 'none';
+            document.getElementById('qdStep2').style.display = n === 2 ? '' : 'none';
+            if (n === 2) {
+                document.getElementById('qdNum2').textContent = qdAmtText();
+                const tr = qdState.kind === 'transfer';
+                document.getElementById('qdCatWrap').style.display = tr ? 'none' : '';
+                document.getElementById('qdTrWrap').style.display = tr ? '' : 'none';
+                document.getElementById('qdRemarkWrap').style.display = tr ? 'none' : '';
+                document.getElementById('qdNextHint').textContent = tr ? '选账户 ›' : '选分类 ›';
+                if (!tr) { qdRenderCats(); qdFillAccounts(); qdFillBooks(); qdAutoAccount(); }
+                else { qdFillTrans(); }
+            }
+        }
+        function qdBack() { qdShowStep(1); }
+        function qdKey(k) {
+            let a = qdState.amt;
+            if (k === 'bak') a = a.slice(0, -1);
+            else if (k === '.') { if (!a) a = '0.'; else if (!a.includes('.')) a += '.'; }
+            else {
+                /* 最多两位小数、整数 9 位，防误触出天文数字 */
+                if (a.includes('.') && a.split('.')[1].length >= 2) return qdRenderAmt();
+                if (a.replace('.', '').length >= 9) return qdRenderAmt();
+                if (a === '0') a = (k === '0' ? '0' : k); else a += k;
+            }
+            qdState.amt = a; qdRenderAmt();
+        }
+        function qdNext() {
+            if (!(+qdState.amt > 0)) return showToast('请先输入金额', 'warning');
+            /* 进第 2 步前预选「上次分类」，多数时候只需按一下保存 */
+            if (!qdState.catId && qdState.kind !== 'transfer') {
+                const c = qdLastCat(qdState.kind);
+                if (c) qdState.catId = c.id;
+            }
+            qdShowStep(2);
+        }
+        function qdUseLastCat() {
+            const c = qdLastCat(qdState.kind);
+            if (!c) return;
+            if (!(+qdState.amt > 0)) return showToast('先输入金额，再选分类', 'warning');
+            qdState.catId = c.id;
+            qdShowStep(2);
+        }
+        /* 分类宫格：与 PC 弹层 renderCatPicker 同构，但状态在 qdState（抽屉自己的） */
+        function qdPick(id) {
+            qdState.catId = id || null;
+            qdRenderCats(); qdAutoAccount();
+        }
+        function qdRenderCats() {
+            const box = document.getElementById('qdCatPicker');
+            const kind = qdState.kind;
+            const roots = catTree.filter(c => c.kind === kind);
+            const sel = qdState.catId ? catById(qdState.catId) : null;
+            const activeParentId = sel ? (sel.parentId || sel.id) : null;
+            const selLabel = sel
+                ? ((sel.icon || '') + ' ' + escapeHtml(sel.parentId ? ((catById(sel.parentId) || {}).name || '') + ' / ' + sel.name : sel.name))
+                : '未分类（不指定分类）';
+            let html = '<div class="cp-selected">已选：<b>' + selLabel + '</b></div>';
+            html += '<div class="cp-row">' + roots.map(p => `<button type="button"
+                class="cp-chip${String(activeParentId) === String(p.id) ? ' on' : ''}"
+                onclick="qdPick(${p.id})">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}</button>`).join('') + '</div>';
+            const ap = activeParentId ? catById(activeParentId) : null;
+            if (ap) {
+                const node = catTree.filter(c => c.id === ap.id)[0];
+                const list = node ? node.children : [];
+                if (list.length) {
+                    html += '<div class="cp-kids"><div class="cp-row">'
+                        + `<span class="cp-label">细分类：</span>`
+                        + `<button type="button" class="cp-chip child${String(qdState.catId) === String(ap.id) ? ' on' : ''}"
+                            onclick="qdPick(${ap.id})">只记到「${escapeHtml(ap.name)}」</button>`
+                        + list.map(k => `<button type="button" class="cp-chip child${String(qdState.catId) === String(k.id) ? ' on' : ''}"
+                            onclick="qdPick(${k.id})">${normIcon(k.icon) || ''} ${escapeHtml(k.name)}</button>`).join('')
+                        + '</div></div>';
+                }
+            }
+            box.innerHTML = html;
+        }
+        function qdFillAccounts() {
+            const sel = document.getElementById('qdAccount');
+            const keep = qdState.accId;
+            sel.innerHTML = '<option value="">未指定账户</option>' + accounts.map(a => `<option value="${a.id}">${normIcon(a.icon) || ''} ${escapeHtml(a.name)}</option>`).join('');
+            if (keep && [...sel.options].some(o => o.value === String(keep))) sel.value = String(keep);
+        }
+        function qdFillBooks() {
+            const sel = document.getElementById('qdBook');
+            const keep = sel.value;
+            sel.innerHTML = books.map(b => `<option value="${b.id}">${normIcon(b.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'} ${escapeHtml(b.name)}</option>`).join('');
+            if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+            else if (bookStat && bookStat.defaultBookId) sel.value = String(bookStat.defaultBookId);
+            else if (curBookId) sel.value = String(curBookId);
+        }
+        function qdFillTrans() {
+            const opts = accounts.map(a => `<option value="${a.id}">${normIcon(a.icon) || ''} ${escapeHtml(a.name)}</option>`).join('') || '<option value="">（请先创建账户）</option>';
+            const f = document.getElementById('qdFrom'), t = document.getElementById('qdTo');
+            f.innerHTML = opts; t.innerHTML = opts;
+            if (qdState.fromId && [...f.options].some(o => o.value === String(qdState.fromId))) f.value = String(qdState.fromId);
+            if (qdState.toId && [...t.options].some(o => o.value === String(qdState.toId))) t.value = String(qdState.toId);
+        }
+        function qdOnAccount() {
+            qdState.accId = document.getElementById('qdAccount').value || null;
+            document.getElementById('qdAccHint').style.display = 'none';
+        }
+        function qdOnFrom() { qdState.fromId = document.getElementById('qdFrom').value || null; }
+        function qdOnTo() { qdState.toId = document.getElementById('qdTo').value || null; }
+        /* 「上次同分类账户」：§5.3 消化未指定账户的第二出口；没选分类时回落到上次手动选过的账户 */
+        async function qdAutoAccount() {
+            const hint = document.getElementById('qdAccHint');
+            hint.style.display = 'none'; hint.textContent = '';
+            if (qdState.kind === 'transfer') return;
+            if (qdState.catId) {
+                try {
+                    const r = await apiGet('/api/ledger/last-account?categoryId=' + qdState.catId);
+                    const d = r && r.data;
+                    if (d && d.accountId) {
+                        const sel = document.getElementById('qdAccount');
+                        if ([...sel.options].some(o => o.value === String(d.accountId))) {
+                            if (!qdState.accId) { sel.value = String(d.accountId); qdState.accId = d.accountId; }
+                            /* 图标为页内可信常量走 innerHTML；动态文案含用户数据，走 textNode 防 XSS */
+                            hint.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+                            hint.appendChild(document.createTextNode(' 已带出「' + qdCatLabel(qdState.catId) + '」上次用的账户：' + (accountLabel(qdState.accId) || '').trim()));
+                            hint.style.display = 'block';
+                        }
+                        /* 上次记账所在账本也一并带出 */
+                        if (d.bookId) {
+                            const bs = document.getElementById('qdBook');
+                            if ([...bs.options].some(o => o.value === String(d.bookId))) bs.value = String(d.bookId);
+                        }
+                    }
+                } catch (e) { }
+            } else {
+                let last = '';
+                try { last = localStorage.getItem('ledgerLastAccount') || ''; } catch (e) { }
+                if (last) {
+                    const sel = document.getElementById('qdAccount');
+                    if ([...sel.options].some(o => o.value === last)) { sel.value = last; qdState.accId = last; }
+                }
+            }
+        }
+        function qdSave() {
+            const kind = qdState.kind;
+            const date = document.getElementById('qdDate').value || todayStr();
+            /* 与 saveRecord 相同的前置校验，先在抽屉里拦住，避免关抽屉后才报错丢输入 */
+            if (!(+qdState.amt > 0) || !date) return showToast('金额和日期不能为空', 'warning');
+            if (kind === 'transfer') {
+                if (!qdState.fromId || !qdState.toId) return showToast('请选择转出与转入账户', 'warning');
+                if (String(qdState.fromId) === String(qdState.toId)) return showToast('转出与转入账户不能相同', 'warning');
+            }
+            /* 抽屉状态 → 既有表单字段 → saveRecord()（唯一保存路径） */
+            document.getElementById('lKind').value = kind;
+            setRecordKind(kind);
+            document.getElementById('lAmount').value = qdState.amt;
+            document.getElementById('lDate').value = date;
+            document.getElementById('lMethod').value = '';
+            document.getElementById('lMember').value = '';
+            document.getElementById('lRemark').value = document.getElementById('qdRemark').value.trim();
+            document.getElementById('lCategory').value = qdState.catId ? String(qdState.catId) : '';
+            document.getElementById('lAccount').value = qdState.accId ? String(qdState.accId) : '';
+            document.getElementById('lFromAccount').value = qdState.fromId ? String(qdState.fromId) : '';
+            document.getElementById('lToAccount').value = qdState.toId ? String(qdState.toId) : '';
+            const bk = document.getElementById('qdBook').value;
+            if (bk) document.getElementById('lBook').value = bk;
+            editingId = qdState.editingId;
+            closeModal('quickDrawer');
+            saveRecord();
+        }
+
+        /* --- 分类管理 --- */
+        function openCategoryModal() { renderCategoryLists(); openModal('categoryModal'); }
+        function renderCategoryLists() {
+            const row = c => `<div class="vault-item" style="padding:8px 10px;margin-bottom:6px;">
+                <div class="v-info"><div class="v-title" style="font-weight:400;">${normIcon(c.icon) || ''} ${escapeHtml(c.name)}</div></div>
+                <button class="icon-btn danger" onclick="removeCategory(${c.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div>`;
+            /* 迭代 2：一级分类下缩进列出二级，并给一级一个「加子类」输入框 */
+            const tree = kind => (catTree.filter(p => p.kind === kind)).map(p => {
+                const kids = p.children.map(c => `<div class="vault-item" style="padding:5px 10px 5px 24px;margin-bottom:4px;border:0;">
+                    <div class="v-info"><div class="v-title" style="font-weight:400;font-size:12px;color:var(--text-secondary);">└ ${normIcon(c.icon) || ''} ${escapeHtml(c.name)}</div></div>
+                    <button class="icon-btn danger" onclick="removeCategory(${c.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div>`).join('');
+                return `<div class="vault-item" style="padding:8px 10px;margin-bottom:6px;">
+                    <div class="v-info"><div class="v-title" style="font-weight:400;">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}
+                        <span class="pill muted" style="font-size:12px;">${p.children.length} 个二级</span></div></div>
+                    <button class="icon-btn danger" onclick="removeCategory(${p.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button></div>` + kids;
+            }).join('') || '<div class="field-hint">暂无</div>';
+            document.getElementById('expenseCatList').innerHTML = tree('expense');
+            document.getElementById('incomeCatList').innerHTML = tree('income');
+            /* 二级分类新增输入框（跟随一级选择） */
+            const fill = (selId, subId, kind) => {
+                const sel = document.getElementById(selId);
+                if (!sel) return;
+                const keep = sel.value;
+                sel.innerHTML = catTree.filter(p => p.kind === kind)
+                    .map(p => `<option value="${p.id}">${normIcon(p.icon) || ''} ${escapeHtml(p.name)}</option>`).join('');
+                if (keep) sel.value = keep;
+            };
+            fill('newExpenseSubParent', 'newExpenseSub', 'expense');
+            fill('newIncomeSubParent', 'newIncomeSub', 'income');
+        }
+
+        // ---------- 导入账单 CSV ----------
+        function openImportModal() {
+            document.getElementById('impCsv').value = '';
+            document.getElementById('impErr').style.display = 'none';
+            document.getElementById('impResult').style.display = 'none';
+            openModal('importModal');
+        }
+
+        /* ---------- P3-7 重复记录清理 ---------- */
+        async function openDedupModal() {
+            const r = await apiGet('/api/ledger/duplicates');
+            const groups = (r && r.data) || [];
+            if (!groups.length) { showToast('没有发现重复记录', 'success'); return; }
+            // 每组默认保留最早一条（id 最小）
+            window.__dedupSel = groups.map(g => ({
+                key: g.key, total: g.total, records: g.records,
+                keepId: g.records.slice().sort((a, b) => a.id - b.id)[0].id
+            }));
+            renderDedupModal();
+            openModal('dedupModal');
+        }
+        function renderDedupModal() {
+            const sel = window.__dedupSel || [];
+            let willDelete = 0;
+            const html = sel.map((g, gi) => {
+                willDelete += (g.total - 1);
+                return '<div style="margin-bottom:14px;border:1px solid var(--border-color);border-radius:8px;padding:10px;">'
+                    + '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">' + escapeHtml(g.key.replace(/\|/g, ' · ')) + '　共 ' + g.total + ' 条</div>'
+                    + g.records.map(rec => '<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;">'
+                        + '<input type="radio" name="dedup--' + gi + '" ' + (rec.id === g.keepId ? 'checked' : '')
+                        + ' onchange="__dedupSel[' + gi + '].keepId=' + rec.id + ';renderDedupModal()">'
+                        + '<span>' + escapeHtml(rec.date) + ' · ' + escapeHtml(rec.categoryName || '—') + ' · ' + money(rec.amount)
+                        + (rec.remark ? ' · ' + escapeHtml(rec.remark) : '') + '</span>'
+                        + '<span style="color:var(--text-secondary);">（' + (rec.id === g.keepId ? '保留' : '将删除') + '）</span>'
+                        + '</div>').join('')
+                    + '</div>';
+            }).join('');
+            document.getElementById('dedupBody').innerHTML = html;
+            document.getElementById('dedupSummary').textContent = '将删除 ' + willDelete + ' 条（不可撤销，可先在系统设置点「立即备份」）';
+        }
+        async function confirmDedup() {
+            const sel = window.__dedupSel || [];
+            let removed = 0, errs = 0;
+            for (const g of sel) {
+                const removeIds = g.records.filter(r => r.id !== g.keepId).map(r => r.id);
+                if (!removeIds.length) continue;
+                const r = await apiPost('/api/ledger/duplicates/cleanup', { keepId: g.keepId, removeIds });
+                if (r && r.code === 200) removed += (r.data ? r.data.removed : 0); else errs++;
+            }
+            closeModal('dedupModal');
+            showToast(errs ? ('已删除 ' + removed + ' 条，' + errs + ' 组失败') : ('已删除 ' + removed + ' 条重复记录'), errs ? 'warning' : 'success');
+            loadAll();                               // 四卡/占比/趋势即时刷新
+        }
+
+        function readCsvFile() {
+            const f = document.getElementById('impFile').files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = e => { document.getElementById('impCsv').value = e.target.result; };
+            r.readAsText(f, 'utf-8');
+        }
+        async function doImport() {
+            const csv = document.getElementById('impCsv').value.trim();
+            if (!csv) return showToast('请先选择或粘贴 CSV', 'warning');
+            const btn = document.getElementById('impBtn');
+            btn.disabled = true; btn.textContent = 'AI 分类中…（约需 10-30 秒）';
+            document.getElementById('impErr').style.display = 'none';
+            document.getElementById('impResult').style.display = 'none';
+            try {
+                const r = await apiPost('/api/ledger/import-csv', { csv });
+                if (r.code !== 200) throw new Error(r.message || '导入失败');
+                document.getElementById('impResult').innerHTML =
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 已导入 ' + r.data.total + ' 笔（支出 ¥' + r.data.expense + ' / 收入 ¥' + r.data.income + '），AI 分类 ' + r.data.categorized + ' 笔';
+                document.getElementById('impResult').style.display = 'block';
+                loadAll();
+            } catch (e) {
+                document.getElementById('impErr').textContent = e.message || '导入失败';
+                document.getElementById('impErr').style.display = 'block';
+            } finally {
+                btn.disabled = false; btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI 分类并导入';
+            }
+        }
+
+        async function addCategory(kind, parentId) {
+            const inputId = parentId
+                ? (kind === 'expense' ? 'newExpenseSub' : 'newIncomeSub')
+                : (kind === 'expense' ? 'newExpenseCat' : 'newIncomeCat');
+            const el = document.getElementById(inputId);
+            if (!el) return showToast('请从分类管理里的输入框添加', 'warning');
+            const name = el.value.trim();
+            if (!name) return showToast('请输入分类名', 'warning');
+            const r = await apiPost('/api/ledger/categories', { name, kind, icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>', parentId: parentId || null });
+            if (r.code !== 200) return showToast(r.message || '添加失败', 'error');
+            el.value = '';
+            categories = (await apiGet('/api/ledger/categories?all=1')).data || [];
+            refreshCatTree();
+            renderCategoryLists(); renderFilters(); renderCategoryOptions();
+            syncCatPickerFromSelect(); renderCatPicker();
+            showToast(parentId ? '已添加二级分类' : '已添加一级分类');
+        }
+        async function removeCategory(id) {
+            if (!(await confirmDel('确定删除该分类？一级分类需先清空其下的二级分类与流水。'))) return;
+            const r = await apiDelete('/api/ledger/categories/' + id);
+            if (r.code !== 200) return showToast(r.message || '删除失败', 'error');
+            categories = (await apiGet('/api/ledger/categories?all=1')).data || [];
+            refreshCatTree();
+            renderCategoryLists(); loadAll();
+        }
+        function refreshCatTree() {
+            catTree = categories.filter(c => !c.parentId)
+                .map(p => Object.assign({}, p, { children: categories.filter(c => c.parentId === p.id) }));
+        }
+
+        function exportCSV() {
+            const rows = mergedRows();
+            if (!rows.length) return showToast('暂无数据', 'warning');
+            let csv = '\ufeff日期,类型,分类,账本,金额,账户,支付方式,家人,备注,来源\n';
+            rows.forEach(r => {
+                csv += [r.date, r.kind === 'income' ? '收入' : r.kind === 'transfer' ? '转账' : '支出',
+                    (r.catText || '').replace(/,/g, ' '), (r.bookText || '').replace(/,/g, ' '), r.amount,
+                    (r.accName || '').replace(/,/g, ' '),
+                    r.method || '', memberName(r.memberId) || '', (r.remark || '').replace(/[\n,]/g, ' '),
+                    r.auto ? '人情记账' : '手动'].join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '家庭账本_' + monthOf() + '.csv';
+            a.click();
+        }
+
+        /* --- 迭代 1：账户管理（增改删 + 期初余额） --- */
+        function openAccountModal() { renderAccountLists(); openModal('accountModal'); }
+        function renderAccountLists() {
+            const box = document.getElementById('accManageList');
+            if (!accounts.length) { box.innerHTML = '<div class="field-hint">暂无账户</div>'; return; }
+            box.innerHTML = accounts.map(a => `<div class="vault-item" style="padding:8px 10px;margin-bottom:6px;">
+                <div class="v-info">
+                    <div class="v-title" style="font-weight:400;">${normIcon(a.icon) || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>'} ${escapeHtml(a.name)}
+                        <span class="pill muted" style="font-size:12px;">期初 ${money(a.initialBalance)}</span></div>
+                    <div class="field-hint">余额 ${money(a.balance)} · 本月 ${a.monthDelta > 0 ? '+' : ''}${money(a.monthDelta)}</div>
+                </div>
+                <button class="icon-btn" onclick="editAccountBalance(${a.id})" title="设期初余额"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+                <button class="icon-btn danger" onclick="removeAccount(${a.id})" title="删除账户"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+            </div>`).join('');
+        }
+        async function addAccount() {
+            const name = document.getElementById('newAccName').value.trim();
+            if (!name) return showToast('请输入账户名称', 'warning');
+            const r = await apiPost('/api/ledger/accounts', {
+                name,
+                type: document.getElementById('newAccType').value,
+                icon: document.getElementById('newAccIcon').value.trim() || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+                initialBalance: +document.getElementById('newAccInit').value || 0
+            });
+            if (r.code !== 200) return showToast(r.message || '创建失败', 'error');
+            document.getElementById('newAccName').value = '';
+            document.getElementById('newAccInit').value = '';
+            document.getElementById('newAccIcon').value = '';
+            showToast('已创建账户'); await loadAll(); renderAccountLists();
+        }
+        async function editAccountBalance(id) {
+            const a = accounts.find(x => x.id === id); if (!a) return;
+            const v = window.prompt('设置「' + a.name + '」的期初余额（元）。\n提示：余额 = 期初 + 该账户全部流水，改期初会整体平移余额。', String(a.initialBalance));
+            if (v === null) return;
+            const n = Number(v);
+            if (!Number.isFinite(n)) return showToast('请输入数字', 'warning');
+            const r = await apiPut('/api/ledger/accounts/' + id, { initialBalance: n });
+            if (r.code !== 200) return showToast(r.message || '保存失败', 'error');
+            showToast('已更新期初余额'); await loadAll(); renderAccountLists();
+        }
+        async function removeAccount(id) {
+            if (!(await confirmDel('确定删除该账户吗？有流水的账户无法删除。'))) return;
+            const r = await apiDelete('/api/ledger/accounts/' + id);
+            if (r.code !== 200) return showToast(r.message || '删除失败', 'error');
+            showToast('已删除'); await loadAll(); renderAccountLists();
+        }
+
+        /* --- P1-3 账本减负：折叠开关（仅移动端 CSS 生效，桌面端调用无副作用） --- */
+        function lgToggleOverview(force) {
+            const el = document.getElementById('lgOverview');
+            const open = force !== undefined ? !!force : !el.classList.contains('open');
+            el.classList.toggle('open', open);
+            document.getElementById('lgMoreToggle').classList.toggle('open', open);
+            document.getElementById('lgMoreToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+            document.getElementById('lgMoreCaret').textContent = open ? '▴' : '▾';
+            try { localStorage.setItem('lgOverviewOpen', open ? '1' : '0'); } catch (e) { }
+        }
+        function lgToggleFilters() {
+            const el = document.getElementById('lgFilters');
+            const open = !el.classList.contains('open');
+            el.classList.toggle('open', open);
+            const btn = document.getElementById('lgFilterToggle');
+            btn.classList.toggle('open', open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            btn.textContent = open ? '筛选 ▴' : '筛选 ▾';
+        }
+
+        document.getElementById('filterMonth').value = todayStr().slice(0, 7);
+        // P1-3：恢复「财务概览」上次的展开偏好（移动端默认收起）
+        try { if (localStorage.getItem('lgOverviewOpen') === '1') lgToggleOverview(true); } catch (e) { }
+        loadAll().then(() => {
+            // 首页「完成并记一笔」跳转而来：?record=1&remark=<事务标题> → 开记录弹窗并预填备注（桌面 lRemark / 移动抽屉 qdRemark）
+            try {
+                const up = new URLSearchParams(location.search);
+                if (up.get('record') === '1') {
+                    const remark = up.get('remark') || '';
+                    openRecordModal();
+                    setTimeout(() => {
+                        if (remark) {
+                            const a = document.getElementById('lRemark'); if (a) a.value = remark;
+                            const b = document.getElementById('qdRemark'); if (b) b.value = remark;
+                        }
+                    }, 90);
+                    history.replaceState(null, '', location.pathname);   // 清参数，避免刷新重复弹窗
+                }
+            } catch (e) { /* 预填失败不应阻断账本页 */ }
+        });
+    </script>
+</body>
+</html>

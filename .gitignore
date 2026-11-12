@@ -1,0 +1,11 @@
+# 运行时数据与敏感信息，禁止入库
+data/
+*.stop-token
+sessions.json
+
+# 日志与临时文件
+*.log
+node_modules/
+
+# 历史旧版残留（评审报告建议清出 public/）
+*.bak-*

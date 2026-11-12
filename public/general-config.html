@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通用配置 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <div class="gconfig-flex">
+            <!-- 左侧子菜单 -->
+            <div class="gconfig-menu">
+                <div class="gconfig-menu-item active" data-panel="channels" onclick="switchPanel('channels')">
+                    <span class="gm-icon gm-green"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+                    <span class="gm-text"><b>通道管理</b><i>管理通知推送渠道</i></span>
+                </div>
+                <div class="gconfig-menu-item" data-panel="templates" onclick="switchPanel('templates')">
+                    <span class="gm-icon gm-blue"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                    <span class="gm-text"><b>消息模板</b><i>管理消息推送模板</i></span>
+                </div>
+                <div class="gconfig-menu-item" data-panel="external" onclick="switchPanel('external')">
+                    <span class="gm-icon gm-purple"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+                    <span class="gm-text"><b>外部系统</b><i>第三方 API 对接配置</i></span>
+                </div>
+                <div class="gconfig-menu-item" data-panel="subscribe" onclick="switchPanel('subscribe')">
+                    <span class="gm-icon gm-teal"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                    <span class="gm-text"><b>日历订阅</b><i>订阅本机日历</i></span>
+                </div>
+                <div class="gconfig-menu-item" data-panel="statuses" onclick="switchPanel('statuses')">
+                    <span class="gm-icon gm-orange"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>
+                    <span class="gm-text"><b>状态管理</b><i>自定义事务状态配置</i></span>
+                </div>
+                <div class="gconfig-menu-item" data-panel="users" onclick="switchPanel('users')">
+                    <span class="gm-icon gm-dark"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                    <span class="gm-text"><b>用户管理</b><i>管理系统用户账号</i></span>
+                </div>
+            </div>
+
+            <!-- 右侧内容 -->
+            <div class="gconfig-body">
+
+                <!-- ① 通道管理 -->
+                <div class="gconfig-panel" id="panel-channels">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">通道管理</h2>
+                        <button class="btn btn-primary" onclick="showChannelModal()">+ 新建通道</button>
+                    </div>
+                    <p class="panel-desc">通道用于把<b>事务提醒</b>推送到外部应用（企业微信 / 钉钉 / 飞书 / 邮件等）。可添加多个通道并分别启用。
+                        <br>每日晨报请在 <a href="/settings#pushGroup" onclick="location.href='/settings#pushGroup';return false;">系统设置 → 消息推送</a> 配置 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></p>
+                    <div class="table-wrap" id="channelWrap">
+                        <table class="data-table">
+                            <thead><tr>
+                                <th style="width:60px;">#</th><th>通道名称</th><th style="width:120px;">类型</th>
+                                <th style="width:120px;">推送类型</th><th style="width:120px;">启用状态</th>
+                                <th style="width:160px;">创建时间</th><th style="width:100px;">操作</th>
+                            </tr></thead>
+                            <tbody id="channelTbody"></tbody>
+                        </table>
+                    </div>
+                    <div id="channelEmpty" class="c-empty c-empty-block" style="display:none;">
+                        <span class="c-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+                        <span class="c-empty-title">暂无通知通道</span>
+                        <span class="c-empty-text">通道用于把事务提醒推送到企业微信 / 钉钉 / 飞书 / 邮件等外部应用</span>
+                        <button class="c-btn c-btn-primary" onclick="showChannelModal()">新建第一个通道</button>
+                    </div>
+                </div>
+
+                <!-- ② 消息模板 -->
+                <div class="gconfig-panel" id="panel-templates" style="display:none;">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">消息模板</h2>
+                        <div class="toolbar-row">
+                            <button class="btn btn-secondary" onclick="resetTpls()">重置默认</button>
+                            <button class="btn btn-primary" onclick="showTplModal()">+ 添加模板</button>
+                        </div>
+                    </div>
+                    <div class="seg-tabs">
+                        <div class="seg-tab active" data-tab="custom" onclick="switchTplTab('custom')">自定义模板</div>
+                        <div class="seg-tab" data-tab="system" onclick="switchTplTab('system')">系统模板</div>
+                    </div>
+                    <div class="toolbar-row" style="margin-bottom:14px;">
+                        <div class="toolbar-left">
+                            <select class="input-sm" id="tplTypeFilter" onchange="renderTpls()">
+                                <option value="">全部类型</option>
+                                <option value="task">事务提醒</option>
+                                <option value="expiry">到期提醒</option>
+                                <option value="anniversary">纪念日提醒</option>
+                                <option value="loan">贷款提醒</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrap" id="tplWrap">
+                        <table class="data-table">
+                            <thead><tr>
+                                <th style="width:60px;">#</th><th>模板名称</th><th style="width:110px;">类型</th>
+                                <th style="width:100px;">内容类型</th><th style="width:80px;">默认</th>
+                                <th style="width:80px;">启用</th><th style="width:160px;">创建时间</th><th style="width:100px;">操作</th>
+                            </tr></thead>
+                            <tbody id="tplTbody"></tbody>
+                        </table>
+                    </div>
+                    <div id="tplEmpty" class="c-empty c-empty-block" style="display:none;">
+                        <span class="c-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                        <span class="c-empty-title">暂无消息模板</span>
+                        <span class="c-empty-text">模板决定提醒消息的内容格式，可按事务 / 到期 / 纪念日 / 贷款分别定制</span>
+                        <button class="c-btn c-btn-primary" onclick="showTplModal()">添加第一个模板</button>
+                    </div>
+                </div>
+
+                <!-- ③ 外部系统 -->
+                <div class="gconfig-panel" id="panel-external" style="display:none;">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">外部系统</h2>
+                        <label class="switch switch-sm"><input type="checkbox" id="extEnabled" onchange="saveExternal()"><span class="slider"></span></label>
+                    </div>
+                    <p class="panel-desc">开启后，第三方系统可使用下方 AppKey / AppSecret 调用本系统的开放接口，实现数据互通。</p>
+
+                    <div class="ext-block">
+                        <div class="ext-block-head">
+                            <div>
+                                <div class="ext-block-title">访问地址</div>
+                                <div class="ext-block-sub">外部系统访问本服务的接口根地址</div>
+                            </div>
+                            <button class="btn btn-secondary btn-xs" onclick="copyText(document.getElementById('extBase').textContent)">复制</button>
+                        </div>
+                        <input class="input-readonly" id="extBase" readonly value="">
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-head">
+                            <div>
+                                <div class="ext-block-title">AppKey</div>
+                                <div class="ext-block-sub">请求头 <code class="inline-code">X-App-Key</code></div>
+                            </div>
+                            <div class="toolbar-row">
+                                <button class="btn btn-secondary btn-xs" onclick="toggleKey('extKey')">显示/隐藏</button>
+                                <button class="btn btn-secondary btn-xs" onclick="copyText(document.getElementById('extKey').value)">复制</button>
+                            </div>
+                        </div>
+                        <input class="input-readonly" id="extKey" type="password" readonly value="">
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-head">
+                            <div>
+                                <div class="ext-block-title">AppSecret</div>
+                                <div class="ext-block-sub">请求头 <code class="inline-code">X-App-Secret</code>，请勿泄露给他人</div>
+                            </div>
+                            <div class="toolbar-row">
+                                <button class="btn btn-secondary btn-xs" onclick="toggleKey('extSecret')">显示/隐藏</button>
+                                <button class="btn btn-secondary btn-xs" onclick="copyText(document.getElementById('extSecret').value)">复制</button>
+                                <button class="btn btn-danger-outline btn-xs" onclick="regenSecret()">重新生成</button>
+                            </div>
+                        </div>
+                        <input class="input-readonly" id="extSecret" type="password" readonly value="">
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-title" style="margin-bottom:12px;">接口说明</div>
+                        <div class="table-wrap table-nosticky">
+                            <table class="data-table">
+                                <thead><tr>
+                                    <th style="width:100px;">方法</th><th style="width:220px;">路径</th><th>说明</th>
+                                </tr></thead>
+                                <tbody>
+                                    <tr><td><span class="method-tag m-get">GET</span></td><td><code class="inline-code">/api/external/tasks</code></td><td>查询事务列表，支持 <code class="inline-code">?keyword=</code> 与 <code class="inline-code">?page=&amp;pageSize=</code></td></tr>
+                                    <tr><td><span class="method-tag m-post">POST</span></td><td><code class="inline-code">/api/external/tasks</code></td><td>新增一条事务</td></tr>
+                                    <tr><td><span class="method-tag m-put">PUT</span></td><td><code class="inline-code">/api/external/tasks/:id</code></td><td>更新指定事务</td></tr>
+                                    <tr><td><span class="method-tag m-del">DELETE</span></td><td><code class="inline-code">/api/external/tasks/:id</code></td><td>删除指定事务</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ④ 日历订阅 -->
+                <div class="gconfig-panel" id="panel-subscribe" style="display:none;">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">日历订阅</h2>
+                    </div>
+                    <p class="panel-desc">把本系统的事务与纪念日同步到手机 / 电脑自带日历，无需打开本系统即可查看日程。</p>
+
+                    <div class="steps-box">
+                        <div class="steps-title">使用步骤</div>
+                        <ol class="steps-list">
+                            <li>复制下方的订阅链接</li>
+                            <li>打开系统日历（Windows 日历 / Apple 日历 / Google 日历）</li>
+                            <li>选择「添加日历 → 通过 URL 订阅」并粘贴链接</li>
+                            <li>保存后即可自动同步，更新频率由日历客户端决定</li>
+                        </ol>
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-title" style="margin-bottom:12px;">订阅范围</div>
+                        <div class="range-row">
+                            <span class="range-label">空间</span>
+                            <span class="range-chip active">个人空间</span>
+                        </div>
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-title" style="margin-bottom:12px;">时间范围</div>
+                        <div class="range-row">
+                            <span class="range-label">从</span>
+                            <input type="date" class="input-sm" id="icsFrom">
+                            <span class="range-label">至</span>
+                            <input type="date" class="input-sm" id="icsTo">
+                        </div>
+                        <div class="range-chips">
+                            <div class="range-pill" data-mode="last1y" onclick="setRange('last1y')">近 1 年</div>
+                            <div class="range-pill" data-mode="next1y" onclick="setRange('next1y')">未来 1 年</div>
+                            <div class="range-pill" data-mode="all" onclick="setRange('all')">全部</div>
+                            <div class="range-pill" data-mode="none" onclick="setRange('none')">不限制</div>
+                        </div>
+                        <div class="toolbar-row" style="margin-top:12px;">
+                            <button class="btn btn-primary btn-xs" onclick="saveIcsRange()">保存时间范围</button>
+                        </div>
+                    </div>
+
+                    <div class="ext-block">
+                        <div class="ext-block-title" style="margin-bottom:12px;">订阅链接</div>
+                        <div class="ics-url-row">
+                            <input class="ics-url-input" id="icsUrl" readonly value="">
+                            <button class="btn btn-primary" onclick="regenSubscribe(false)">生成并刷新</button>
+                            <button class="btn btn-secondary" onclick="copyText(document.getElementById('icsUrl').value)">仅复制</button>
+                        </div>
+                        <div class="toolbar-row" style="margin-top:12px;">
+                            <button class="btn btn-danger-outline btn-xs" onclick="regenSubscribe(true)">重新生成订阅链接</button>
+                        </div>
+                        <p class="ext-tip">重新生成后，旧的订阅链接将立即失效，需要在日历客户端中重新添加。</p>
+                    </div>
+                </div>
+
+                <!-- ⑤ 状态管理 -->
+                <div class="gconfig-panel" id="panel-statuses" style="display:none;">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">状态管理</h2>
+                        <button class="btn btn-primary" onclick="showStatusModal()">+ 新建状态</button>
+                    </div>
+                    <p class="panel-desc">自定义事务状态，并可单独控制每种状态是否发送提醒。系统内置状态不可删除。</p>
+                    <div class="table-wrap" id="statusWrap">
+                        <table class="data-table">
+                            <thead><tr>
+                                <th style="width:70px;">色标</th><th>状态名称</th><th style="width:110px;">类型</th>
+                                <th style="width:90px;">排序</th><th style="width:130px;">发送提醒</th>
+                                <th style="width:160px;">创建时间</th><th style="width:100px;">操作</th>
+                            </tr></thead>
+                            <tbody id="statusTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ⑥ 用户管理 -->
+                <div class="gconfig-panel" id="panel-users" style="display:none;">
+                    <div class="gconfig-panel-head">
+                        <h2 class="gconfig-panel-title">用户管理</h2>
+                        <button class="btn btn-primary" onclick="showUserModal()">+ 添加用户</button>
+                    </div>
+                    <p class="panel-desc">管理系统账号。<b>admin</b> 为超级管理员，不可删除。</p>
+                    <div class="table-wrap" id="userWrap">
+                        <table class="data-table">
+                            <thead><tr>
+                                <th style="width:60px;">#</th><th>用户名</th><th style="width:130px;">角色</th>
+                                <th style="width:180px;">创建时间</th><th style="width:130px;">操作</th>
+                            </tr></thead>
+                            <tbody id="userTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 通道弹窗 -->
+    <div id="channelModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><h3 id="channelModalTitle">新建通道</h3><button class="modal-close" onclick="closeModal('channelModal')">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>通道名称 *</label><input type="text" id="chName" placeholder="如：企业微信机器人"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>类型</label><select id="chType"><option>Webhook</option><option>邮件</option><option>钉钉</option><option>飞书</option><option>企业微信</option></select></div>
+                    <div class="form-group"><label>推送类型</label><select id="chPush"><option>全部</option><option>事务提醒</option><option>到期提醒</option><option>纪念日提醒</option></select></div>
+                </div>
+                <div class="form-group"><label>Webhook / 目标地址</label><input type="text" id="chUrl" placeholder="https://..."></div>
+                <div class="form-group switch-row">
+                    <label class="switch" style="margin:0;"><input type="checkbox" id="chEnabled" checked><span class="slider"></span></label>
+                    <span class="switch-label">启用该通道</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('channelModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveChannel()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模板弹窗 -->
+    <div id="tplModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><h3 id="tplModalTitle">新建模板</h3><button class="modal-close" onclick="closeModal('tplModal')">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>模板名称 *</label><input type="text" id="tplName" placeholder="如：事务提醒模板"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>类型</label><select id="tplType">
+                        <option value="task">事务提醒</option><option value="expiry">到期提醒</option>
+                        <option value="anniversary">纪念日提醒</option><option value="loan">贷款提醒</option>
+                    </select></div>
+                    <div class="form-group"><label>内容类型</label><select id="tplKind"><option>文本</option><option>Markdown</option></select></div>
+                </div>
+                <div class="form-group"><label>模板内容</label><textarea id="tplContent" rows="4" placeholder="支持变量：{标题} {时间} {备注}"></textarea></div>
+                <div class="form-group switch-row">
+                    <label class="switch" style="margin:0;"><input type="checkbox" id="tplEnabled" checked><span class="slider"></span></label>
+                    <span class="switch-label">启用该模板</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('tplModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveTpl()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 状态弹窗 -->
+    <div id="statusModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><h3 id="statusModalTitle">新建状态</h3><button class="modal-close" onclick="closeModal('statusModal')">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>状态名称 *</label><input type="text" id="stName" placeholder="如：待处理"></div>
+                <div class="form-group"><label>颜色</label><select id="stColor">
+                    <option value="#f59e0b">橙色</option><option value="#3b82f6">蓝色</option><option value="#10b981">绿色</option>
+                    <option value="#ef4444">红色</option><option value="#3b82f6">紫色</option><option value="#64748b">灰色</option>
+                </select></div>
+                <div class="form-group"><label>排序</label><input type="number" id="stSort" value="99"></div>
+                <div class="form-group switch-row">
+                    <label class="switch" style="margin:0;"><input type="checkbox" id="stRemind" checked><span class="slider"></span></label>
+                    <span class="switch-label">该状态的事务发送提醒</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('statusModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveStatus()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加用户弹窗 -->
+    <div id="userModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><h3>添加用户</h3><button class="modal-close" onclick="closeModal('userModal')">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>用户名 *</label><input type="text" id="nuName" placeholder="登录用户名"></div>
+                <div class="form-group"><label>密码 *</label><input type="password" id="nuPwd" placeholder="至少 6 位"></div>
+                <div class="form-group"><label>角色</label><select id="nuRole"><option value="user">普通用户</option><option value="admin">管理员</option></select></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('userModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveNewUser()">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重置密码弹窗 -->
+    <div id="pwdModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header"><h3>修改密码</h3><button class="modal-close" onclick="closeModal('pwdModal')">&times;</button></div>
+            <div class="modal-body">
+                <p class="panel-desc" style="margin-top:0;">为 <b id="pwdUserName">--</b> 设置新密码</p>
+                <div class="form-group"><label>新密码 *</label><input type="password" id="pwdNew" placeholder="至少 6 位"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('pwdModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveResetPwd()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('general-config', '通用配置');
+
+        var channels = [], templates = [], statuses = [], users = [];
+        var editingChannelId = null, editingTplId = null, editingStatusId = null, editingUserId = null;
+        var tplTab = 'custom';
+        var DEFAULT_TPLS = [
+            { name: '事务提醒', type: 'task', kind: '文本', def: true, enabled: true, content: '【生活驾驶舱】您有一条事务「{标题}」将于 {时间} 到期，请及时处理。' },
+            { name: '到期提醒', type: 'expiry', kind: '文本', def: true, enabled: true, content: '【生活驾驶舱】事项「{标题}」已于 {时间} 到期，请注意查收。' },
+            { name: '纪念日提醒', type: 'anniversary', kind: '文本', def: false, enabled: true, content: '【生活驾驶舱】今天是「{标题}」，已陪伴 {时间}。' },
+            { name: '贷款还款提醒', type: 'loan', kind: '文本', def: false, enabled: true, content: '【生活驾驶舱】您的贷款「{标题}」将于 {时间} 扣款，请提前准备。' }
+        ];
+
+        function switchPanel(name) {
+            var valid = ['channels', 'templates', 'external', 'subscribe', 'statuses', 'users'];
+            if (valid.indexOf(name) < 0) name = 'channels';
+            document.querySelectorAll('.gconfig-menu-item').forEach(function (el) {
+                el.classList.toggle('active', el.dataset.panel === name);
+            });
+            document.querySelectorAll('.gconfig-panel').forEach(function (el) { el.style.display = 'none'; });
+            document.getElementById('panel-' + name).style.display = '';
+            if (name === 'statuses') loadStatuses();
+            if (name === 'users') loadUsers();
+            if (name === 'external') renderExternal();
+            // 同步 URL hash（replaceState 不产生历史记录）
+            history.replaceState(null, '', '#' + name);
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        function nowLocal() {
+            var d = new Date();
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+                + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        }
+        function copyText(t) {
+            if (!t) return showToast('没有可复制的内容', 'warning');
+            if (navigator.clipboard) navigator.clipboard.writeText(t);
+            showToast('已复制到剪贴板');
+        }
+        function cfg() { return { channels: channels, msgTemplates: templates }; }
+        async function saveCfg() { return await apiPut('/api/settings/config', cfg()); }
+
+        /* ================= ① 通道管理 ================= */
+        async function loadAll() {
+            var r = await apiGet('/api/settings/config');
+            if (r.code === 200 && r.data) {
+                channels = r.data.channels || [];
+                templates = r.data.msgTemplates || [];
+                appCfg = r.data;
+            }
+            renderChannels(); renderTpls(); renderExternal(); renderSubscribe();
+            document.getElementById('icsUrl').value = location.origin + '/api/calendar.ics?token=' + (appCfg.subscribeToken || '');
+        }
+        var appCfg = {};
+        function renderChannels() {
+            var tb = document.getElementById('channelTbody');
+            var has = channels.length > 0;
+            document.getElementById('channelWrap').style.display = has ? '' : 'none';
+            document.getElementById('channelEmpty').style.display = has ? 'none' : '';
+            tb.innerHTML = channels.map(function (c, i) {
+                var on = c.enabled !== false;
+                return '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(c.name) + '</b></td>'
+                    + '<td>' + escapeHtml(c.type || 'Webhook') + '</td>'
+                    + '<td>' + escapeHtml(c.push || '全部') + '</td>'
+                    + '<td>' + (on
+                        ? '<span class="status-tag tag-on"><span class="dot"></span>启用</span>'
+                        : '<span class="status-tag tag-off"><span class="dot"></span>停用</span>') + '</td>'
+                    + '<td class="muted">' + escapeHtml(c.createdAt || '—') + '</td>'
+                    + '<td><div class="task-actions">'
+                    + '<button class="icon-btn" title="编辑" onclick="editChannel(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+                    + '<button class="icon-btn danger" title="删除" onclick="delChannel(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>'
+                    + '</div></td></tr>';
+            }).join('');
+        }
+        function showChannelModal() {
+            editingChannelId = null;
+            document.getElementById('channelModalTitle').textContent = '新建通道';
+            document.getElementById('chName').value = '';
+            document.getElementById('chType').value = 'Webhook';
+            document.getElementById('chPush').value = '全部';
+            document.getElementById('chUrl').value = '';
+            document.getElementById('chEnabled').checked = true;
+            openModal('channelModal');
+        }
+        function editChannel(i) {
+            var c = channels[i];
+            editingChannelId = i;
+            document.getElementById('channelModalTitle').textContent = '编辑通道';
+            document.getElementById('chName').value = c.name || '';
+            document.getElementById('chType').value = c.type || 'Webhook';
+            document.getElementById('chPush').value = c.push || '全部';
+            document.getElementById('chUrl').value = c.url || '';
+            document.getElementById('chEnabled').checked = c.enabled !== false;
+            openModal('channelModal');
+        }
+        async function saveChannel() {
+            var name = document.getElementById('chName').value.trim();
+            if (!name) return showToast('请输入通道名称', 'warning');
+            var old = editingChannelId === null ? null : channels[editingChannelId];
+            var obj = {
+                name: name, type: document.getElementById('chType').value,
+                push: document.getElementById('chPush').value, url: document.getElementById('chUrl').value,
+                enabled: document.getElementById('chEnabled').checked,
+                createdAt: (old && old.createdAt) || nowLocal()
+            };
+            if (editingChannelId === null) channels.push(obj); else channels[editingChannelId] = obj;
+            var r = await saveCfg();
+            if (r.code === 200) { showToast('已保存'); closeModal('channelModal'); renderChannels(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function delChannel(i) {
+            if (!(await confirmDel('确定删除通道「' + channels[i].name + '」吗？'))) return;
+            channels.splice(i, 1);
+            await saveCfg(); showToast('已删除'); renderChannels();
+        }
+        async function toggleChannel(i) {
+            channels[i].enabled = channels[i].enabled === false;
+            await saveCfg(); renderChannels();
+        }
+
+        /* ================= ② 消息模板 ================= */
+        function switchTplTab(t) {
+            tplTab = t;
+            document.querySelectorAll('.seg-tab').forEach(function (el) {
+                el.classList.toggle('active', el.dataset.tab === t);
+            });
+            renderTpls();
+        }
+        function tplTypeName(t) {
+            return ({ task: '事务提醒', expiry: '到期提醒', anniversary: '纪念日提醒', loan: '贷款提醒' })[t] || '其他';
+        }
+        function renderTpls() {
+            var filter = document.getElementById('tplTypeFilter').value;
+            var list = templates.map(function (t, i) { return { t: t, i: i }; });
+            list = list.filter(function (x) { return tplTab === 'custom' ? !x.t.def : !!x.t.def; });
+            if (filter) list = list.filter(function (x) { return (x.t.type || 'task') === filter; });
+            var tb = document.getElementById('tplTbody');
+            var has = list.length > 0;
+            document.getElementById('tplWrap').style.display = has ? '' : 'none';
+            document.getElementById('tplEmpty').style.display = has ? 'none' : '';
+            tb.innerHTML = list.map(function (x) {
+                var t = x.t, i = x.i;
+                return '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(t.name) + '</b>'
+                    + '<div class="cell-sub">' + escapeHtml((t.content || '').slice(0, 46)) + (t.content && t.content.length > 46 ? '…' : '') + '</div></td>'
+                    + '<td><span class="tag-plain">' + tplTypeName(t.type) + '</span></td>'
+                    + '<td>' + escapeHtml(t.kind || '文本') + '</td>'
+                    + '<td>' + (t.def ? '<span class="tag-builtin">默认</span>' : '—') + '</td>'
+                    + '<td>' + (t.enabled !== false ? '<span class="status-tag tag-on"><span class="dot"></span>启用</span>' : '<span class="status-tag tag-off"><span class="dot"></span>停用</span>') + '</td>'
+                    + '<td class="muted">' + escapeHtml(t.updatedAt || t.createdAt || '—') + '</td>'
+                    + '<td><div class="task-actions">'
+                    + '<button class="icon-btn" title="编辑" onclick="editTpl(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+                    + '<button class="icon-btn danger" title="删除" onclick="delTpl(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>'
+                    + '</div></td></tr>';
+            }).join('');
+        }
+        async function resetTpls() {
+            if (!(await confirmDel('确定重置为系统默认模板吗？自定义模板将被清空。'))) return;
+            templates = DEFAULT_TPLS.map(function (t) {
+                var o = Object.assign({}, t); o.updatedAt = nowLocal(); return o;
+            });
+            saveCfg().then(function () { showToast('已重置'); renderTpls(); });
+        }
+        function showTplModal() {
+            editingTplId = null;
+            document.getElementById('tplModalTitle').textContent = '新建模板';
+            document.getElementById('tplName').value = '';
+            document.getElementById('tplType').value = 'task';
+            document.getElementById('tplKind').value = '文本';
+            document.getElementById('tplContent').value = '';
+            document.getElementById('tplEnabled').checked = true;
+            openModal('tplModal');
+        }
+        function editTpl(i) {
+            var t = templates[i];
+            editingTplId = i;
+            document.getElementById('tplModalTitle').textContent = '编辑模板';
+            document.getElementById('tplName').value = t.name || '';
+            document.getElementById('tplType').value = t.type || 'task';
+            document.getElementById('tplKind').value = t.kind || '文本';
+            document.getElementById('tplContent').value = t.content || '';
+            document.getElementById('tplEnabled').checked = t.enabled !== false;
+            openModal('tplModal');
+        }
+        async function saveTpl() {
+            var name = document.getElementById('tplName').value.trim();
+            if (!name) return showToast('请输入模板名称', 'warning');
+            var old = editingTplId === null ? null : templates[editingTplId];
+            var obj = {
+                name: name, type: document.getElementById('tplType').value,
+                kind: document.getElementById('tplKind').value,
+                content: document.getElementById('tplContent').value,
+                enabled: document.getElementById('tplEnabled').checked,
+                def: old ? old.def : false,
+                updatedAt: nowLocal()
+            };
+            if (editingTplId === null) { obj.createdAt = nowLocal(); templates.push(obj); }
+            else templates[editingTplId] = obj;
+            var r = await saveCfg();
+            if (r.code === 200) { showToast('已保存'); closeModal('tplModal'); renderTpls(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function delTpl(i) {
+            if (!(await confirmDel('确定删除模板「' + templates[i].name + '」吗？'))) return;
+            templates.splice(i, 1);
+            await saveCfg(); showToast('已删除'); renderTpls();
+        }
+
+        /* ================= ③ 外部系统 ================= */
+        function renderExternal() {
+            var c = appCfg || {};
+            document.getElementById('extEnabled').checked = !!c.externalEnabled;
+            document.getElementById('extBase').value = location.origin + '/api/external';
+            document.getElementById('extKey').value = c.appKey || '';
+            document.getElementById('extSecret').value = c.appSecret || '';
+        }
+        function toggleKey(id) {
+            var el = document.getElementById(id);
+            el.type = el.type === 'password' ? 'text' : 'password';
+        }
+        async function saveExternal() {
+            var on = document.getElementById('extEnabled').checked;
+            var r = await apiPut('/api/settings/config', { externalEnabled: on });
+            if (r.code === 200) { appCfg.externalEnabled = on; showToast(on ? '已开启外部系统对接' : '已关闭外部系统对接'); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function regenSecret() {
+            if (!(await confirmDel('重新生成后，旧 AppSecret 将立即失效，确定继续吗？'))) return;
+            var r = await apiPost('/api/settings/regenerate-secret', {});
+            if (r.code === 200) {
+                appCfg.appSecret = r.data.appSecret; document.getElementById('extSecret').value = r.data.appSecret;
+                document.getElementById('extSecret').type = 'text';
+                showToast('AppSecret 已重新生成');
+            } else showToast(r.message || '生成失败', 'error');
+        }
+
+        /* ================= ④ 日历订阅 ================= */
+        function renderSubscribe() {
+            var c = appCfg || {};
+            var rng = c.icsRange || {};
+            document.getElementById('icsFrom').value = rng.from || '';
+            document.getElementById('icsTo').value = rng.to || '';
+            document.querySelectorAll('.range-pill').forEach(function (el) {
+                el.classList.toggle('active', el.dataset.mode === (rng.mode || ''));
+            });
+            document.getElementById('icsUrl').value = location.origin + '/api/calendar.ics?token=' + (c.subscribeToken || '');
+        }
+        function setRange(mode) {
+            var d = new Date(), from = '', to = '';
+            if (mode === 'last1y') { from = new Date(d.getFullYear() - 1, d.getMonth(), d.getDate()); to = d; }
+            else if (mode === 'next1y') { from = d; to = new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()); }
+            function fmt(x) { return x ? x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0') : ''; }
+            document.getElementById('icsFrom').value = fmt(from);
+            document.getElementById('icsTo').value = fmt(to);
+            document.querySelectorAll('.range-pill').forEach(function (el) {
+                el.classList.toggle('active', el.dataset.mode === mode);
+            });
+        }
+        async function saveIcsRange() {
+            var pins = document.querySelectorAll('.range-pill');
+            var mode = '';
+            pins.forEach(function (el) { if (el.classList.contains('active')) mode = el.dataset.mode; });
+            var body = { icsRange: { mode: mode, from: document.getElementById('icsFrom').value, to: document.getElementById('icsTo').value } };
+            var r = await apiPut('/api/settings/config', body);
+            if (r.code === 200) { appCfg.icsRange = body.icsRange; showToast('时间范围已保存'); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function regenSubscribe(regen) {
+            if (regen && !(await confirmDel('重新生成订阅链接后，旧链接将立即失效，确定继续吗？'))) return;
+            if (regen) {
+                var r = await apiPost('/api/settings/regenerate-subscribe', {});
+                if (r.code !== 200) return showToast(r.message || '生成失败', 'error');
+                appCfg.subscribeToken = r.data.subscribeToken;
+            }
+            renderSubscribe();
+            showToast(regen ? '订阅链接已重新生成' : '订阅链接已刷新');
+        }
+
+        /* ================= ⑤ 状态管理 ================= */
+        async function loadStatuses() {
+            var r = await apiGet('/api/statuses');
+            if (r.code === 200) statuses = r.data || [];
+            var tb = document.getElementById('statusTbody');
+            tb.innerHTML = statuses.map(function (s, i) {
+                var on = s.remind !== false;
+                return '<tr><td><span class="status-color-sq" style="background:' + (s.color || '#999') + '"></span></td>'
+                    + '<td><b>' + escapeHtml(s.name) + '</b></td>'
+                    + '<td>' + (s.builtin ? '<span class="tag-builtin">系统内置</span>' : '<span class="tag-custom">自定义</span>') + '</td>'
+                    + '<td class="muted">' + (s.sort == null ? 99 : s.sort) + '</td>'
+                    + '<td><label class="switch switch-sm"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleStatusRemind(' + i + ',this.checked)"><span class="slider"></span></label></td>'
+                    + '<td class="muted">' + escapeHtml(s.createdAt || '—') + '</td>'
+                    + '<td><div class="task-actions">'
+                    + '<button class="icon-btn" title="编辑" onclick="editStatus(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+                    + (s.builtin ? '' : '<button class="icon-btn danger" title="删除" onclick="delStatus(' + i + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>')
+                    + '</div></td></tr>';
+            }).join('');
+        }
+        function showStatusModal() {
+            editingStatusId = null;
+            document.getElementById('statusModalTitle').textContent = '新建状态';
+            document.getElementById('stName').value = '';
+            document.getElementById('stColor').value = '#f59e0b';
+            document.getElementById('stSort').value = 99;
+            document.getElementById('stRemind').checked = true;
+            openModal('statusModal');
+        }
+        function editStatus(i) {
+            var s = statuses[i];
+            editingStatusId = s.id;
+            document.getElementById('statusModalTitle').textContent = '编辑状态';
+            document.getElementById('stName').value = s.name || '';
+            document.getElementById('stColor').value = s.color || '#f59e0b';
+            document.getElementById('stSort').value = s.sort == null ? 99 : s.sort;
+            document.getElementById('stRemind').checked = s.remind !== false;
+            openModal('statusModal');
+        }
+        async function saveStatus() {
+            var name = document.getElementById('stName').value.trim();
+            if (!name) return showToast('请输入状态名称', 'warning');
+            var body = {
+                name: name, color: document.getElementById('stColor').value,
+                sort: parseInt(document.getElementById('stSort').value, 10) || 99,
+                remind: document.getElementById('stRemind').checked
+            };
+            var r = editingStatusId ? await apiPut('/api/statuses/' + editingStatusId, body) : await apiPost('/api/statuses', body);
+            if (r.code === 200) { showToast('已保存'); closeModal('statusModal'); loadStatuses(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function toggleStatusRemind(i, val) {
+            var s = statuses[i];
+            var r = await apiPut('/api/statuses/' + s.id, { remind: val });
+            if (r.code === 200) { s.remind = val; showToast(val ? '已开启提醒' : '已关闭提醒'); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function delStatus(i) {
+            if (!(await confirmDel('确定删除状态「' + statuses[i].name + '」吗？'))) return;
+            var r = await apiDelete('/api/statuses/' + statuses[i].id);
+            if (r.code === 200) { showToast('已删除'); loadStatuses(); }
+            else showToast(r.message || '删除失败（可能仍有事务使用该状态）', 'error');
+        }
+
+        /* ================= ⑥ 用户管理 ================= */
+        async function loadUsers() {
+            var r = await apiGet('/api/users');
+            if (r.code !== 200) return;
+            users = r.data || [];
+            document.getElementById('userTbody').innerHTML = users.map(function (u) {
+                return '<tr><td>' + u.id + '</td><td><b>' + escapeHtml(u.username) + '</b></td>'
+                    + '<td>' + (u.role === 'admin' ? '<span class="tag-admin">管理员</span>' : '<span class="tag-plain">普通用户</span>') + '</td>'
+                    + '<td class="muted">' + escapeHtml(u.createdAt || '—') + '</td>'
+                    + '<td><div class="task-actions"><button class="btn btn-secondary btn-xs" onclick="showResetPwd(' + u.id + ',&quot;' + escapeHtml(u.username) + '&quot;)">修改密码</button></div></td></tr>';
+            }).join('');
+        }
+        function showUserModal() {
+            document.getElementById('nuName').value = '';
+            document.getElementById('nuPwd').value = '';
+            document.getElementById('nuRole').value = 'user';
+            openModal('userModal');
+        }
+        async function saveNewUser() {
+            var name = document.getElementById('nuName').value.trim();
+            var pwd = document.getElementById('nuPwd').value;
+            if (!name) return showToast('请输入用户名', 'warning');
+            if (pwd.length < 6) return showToast('密码至少 6 位', 'warning');
+            var r = await apiPost('/api/users', { username: name, password: pwd, role: document.getElementById('nuRole').value });
+            if (r.code === 200) { showToast('用户已创建'); closeModal('userModal'); loadUsers(); }
+            else showToast(r.message || '创建失败', 'error');
+        }
+        function showResetPwd(id, name) {
+            editingUserId = id;
+            document.getElementById('pwdUserName').textContent = name;
+            document.getElementById('pwdNew').value = '';
+            openModal('pwdModal');
+        }
+        async function saveResetPwd() {
+            var pwd = document.getElementById('pwdNew').value;
+            if (pwd.length < 6) return showToast('密码至少 6 位', 'warning');
+            var r = await apiPut('/api/users/' + editingUserId + '/password', { password: pwd });
+            if (r.code === 200) { showToast('密码已修改'); closeModal('pwdModal'); }
+            else showToast(r.message || '修改失败', 'error');
+        }
+
+        loadAll();
+
+        /* 支持通过 URL hash 直达面板：/general-config#statuses、#users 等 */
+        function openPanelFromHash() {
+            var h = (location.hash || '').replace('#', '');
+            if (h) switchPanel(h);
+        }
+        openPanelFromHash();
+        window.addEventListener('hashchange', openPanelFromHash);
+    </script>
+</body>
+</html>

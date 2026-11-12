@@ -1,0 +1,26 @@
+{
+  "name": "life-cockpit",
+  "version": "1.48.54",
+  "description": "生活驾驶舱 - 零依赖 Node.js 家庭生活管理工作台",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:sqlite": "node server.js --sqlite",
+    "test": "node --test \"tests/*.test.js\"",
+    "test:smoke": "node --test tests/smoke.test.js",
+    "audit:contrast": "node scripts/audit-contrast.mjs",
+    "arch:size": "node scripts/arch-size.mjs",
+    "arch:deps": "node scripts/arch-deps.mjs",
+    "arch:auth": "node scripts/arch-auth.mjs",
+    "arch:func": "node scripts/arch-func.mjs",
+    "arch:routes": "node scripts/route-inventory.js",
+    "storage:migrate": "node scripts/migrate-storage.js",
+    "diff:api": "node scripts/diff-api.js",
+    "check": "npm test && npm run audit:contrast && npm run arch:size && npm run arch:func && npm run arch:deps && npm run arch:auth"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "private": true,
+  "license": "UNLICENSED"
+}

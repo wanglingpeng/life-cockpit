@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>纪念日 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* ---- 批次2：纪念日页蓝系收敛 + 交互五态 + 图标对齐（仅本页覆盖，不动公共文件） ---- */
+        /* 统计卡图标底色收敛为蓝色系 */
+        .stat-icon-total { background: rgba(59,130,246,.12); }
+        .stat-icon-progress { background: rgba(59,130,246,.14); }
+        .stat-icon-done { background: rgba(37,99,235,.14); }
+        .stat-mini-icon { display: inline-flex; align-items: center; justify-content: center; }
+        .stat-mini-icon svg, .ann-actions svg, .ann-date svg { vertical-align: -.15em; }
+        .stat-mini-card { transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease; }
+        .stat-mini-card:hover { border-color: rgba(59,130,246,.45); box-shadow: 0 4px 14px rgba(59,130,246,.14); transform: translateY(-1px); }
+        .stat-mini-card:active { transform: translateY(0); box-shadow: none; }
+        .stat-mini-card:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
+        /* 纪念日卡片：hover / active / focus-visible 五态 */
+        .ann-card { transition: transform .2s ease, box-shadow .2s ease; }
+        .ann-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(30,64,175,.18); }
+        .ann-card:active { transform: translateY(-1px); }
+        .ann-card:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+
+        /* 卡片右上角编辑/删除按钮：hover / active / focus-visible / disabled */
+        .ann-card .ann-actions button { transition: background .15s ease, transform .15s ease; }
+        .ann-card .ann-actions button:hover { background: rgba(255,255,255,.42); }
+        .ann-card .ann-actions button:active { background: rgba(255,255,255,.55); transform: scale(.92); }
+        .ann-card .ann-actions button:focus-visible { outline: 2px solid rgba(255,255,255,.9); outline-offset: 2px; }
+        .ann-card .ann-actions button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+        /* 筛选下拉 / 日期 / 输入框五态 */
+        #pageContent select, #pageContent input[type="date"], #annModal select, #annModal input[type="text"], #annModal textarea {
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        #pageContent select:hover, #pageContent input:hover, #annModal select:hover, #annModal input:hover, #annModal textarea:hover {
+            border-color: rgba(59,130,246,.55);
+        }
+        #pageContent select:focus, #pageContent input:focus, #annModal select:focus, #annModal input:focus, #annModal textarea:focus {
+            border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.18); outline: none;
+        }
+        #pageContent select:focus-visible, #pageContent input:focus-visible, #annModal select:focus-visible, #annModal input:focus-visible, #annModal textarea:focus-visible {
+            outline: 2px solid #3b82f6; outline-offset: 1px;
+        }
+        #pageContent select:disabled, #annModal select:disabled, #annModal input:disabled, #annModal textarea:disabled {
+            opacity: .55; cursor: not-allowed;
+        }
+
+        /* 弹窗开关 slider 五态 */
+        #annModal .switch .slider { transition: background .15s ease, box-shadow .15s ease; }
+        #annModal .switch:hover .slider { box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+        #annModal .switch input:focus-visible + .slider { outline: 2px solid #3b82f6; outline-offset: 2px; }
+        #annModal .switch input:active + .slider { box-shadow: 0 0 0 4px rgba(59,130,246,.2); }
+        #annModal .switch input:disabled + .slider { opacity: .5; cursor: not-allowed; }
+
+        /* 弹窗关闭按钮五态 */
+        #annModal .modal-close { transition: background .15s ease, transform .15s ease; }
+        #annModal .modal-close:hover { background: rgba(59,130,246,.1); }
+        #annModal .modal-close:active { background: rgba(59,130,246,.18); transform: scale(.92); }
+        #annModal .modal-close:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+        #annModal .modal-close:disabled { opacity: .5; cursor: not-allowed; }
+
+        /* 空态图标曾在此单独染成 --primary-text（.empty-icon-wrap）。
+           v1.48.39 改用 .c-empty-block 后该类不复存在；组件统一取 .c-empty 的
+           --text-secondary，与其余 9 个已迁移页面一致——不再单页染蓝，
+           否则「同一组件在不同页颜色不同」正是要收敛掉的东西。 */
+
+        /* 触屏：页头筛选/链接/按钮补足 44px 触控高度（与 theme/ 分片里的 pointer:coarse
+         * 段一致；卡片编辑/删除钮已由该段统一覆盖，这里不再重复。
+         * 注：v1.48.39 切分前这里按行号引用主题样式，行号已失效，改为按选择器查找：
+         * grep -n 'pointer: coarse' public/css/theme/02-late.css） */
+        @media (pointer: coarse) {
+            #pageContent .card-header select { min-height: 44px; }
+            #pageContent .card-header .btn { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <div class="card-header" style="margin-bottom:20px;">
+            <span class="card-title" style="font-size:16px;">纪念日</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="filterMember" onchange="loadList()" style="width:auto;">
+                    <option value="">全部家人</option>
+                </select>
+                <a class="btn btn-secondary btn-xs" href="/family">家庭成员</a>
+                <button class="btn btn-primary btn-xs" onclick="showAddModal()">+ 添加纪念日</button>
+            </div>
+        </div>
+        <div class="stat-cards-row" id="annStatRow" style="margin-bottom:16px;">
+            <div class="stat-mini-card">
+                <div class="stat-mini-icon stat-icon-total"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+                <div class="stat-mini-meta">
+                    <div class="stat-mini-value" id="statAll">0</div>
+                    <div class="stat-mini-label">全部纪念日</div>
+                </div>
+            </div>
+            <div class="stat-mini-card">
+                <div class="stat-mini-icon stat-icon-progress"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+                <div class="stat-mini-meta">
+                    <div class="stat-mini-value" id="statHome">0</div>
+                    <div class="stat-mini-label">首页展示</div>
+                </div>
+            </div>
+            <div class="stat-mini-card">
+                <div class="stat-mini-icon stat-icon-done"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                <div class="stat-mini-meta">
+                    <div class="stat-mini-value" id="statSoon">0</div>
+                    <div class="stat-mini-label">30 天内</div>
+                </div>
+            </div>
+        </div>
+        <div class="ann-grid" id="annGrid"></div>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div id="annModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="annModalTitle">添加纪念日</h3>
+                <button class="modal-close" onclick="closeModal('annModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>名称 *</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="aTitle" placeholder="如：结婚纪念日、距离春节" style="flex:1;min-width:0;">
+                    <script data-voice-mic data-target="aTitle"></script>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>日期 *</label>
+                    <input type="date" id="aDate">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="aType">
+                        <option value="count-down">倒计时（还有多少天）</option>
+                        <option value="count-up">正计时（已经多少天）</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>重复</label>
+                    <select id="aRepeat" onchange="syncLunarSwitch()">
+                        <option value="once">单次</option>
+                        <option value="yearly">每年循环</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>卡片颜色</label>
+                    <select id="aColor">
+                        <option value="#3b82f6">品牌蓝</option>
+                        <option value="#4f7cff">亮蓝</option>
+                        <option value="#2563eb">深蓝</option>
+                        <option value="#1d4ed8">藏蓝</option>
+                        <option value="#60a5fa">浅蓝</option>
+                        <option value="#93c5fd">淡蓝</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:8px;" id="aLunarGroup">
+                <label class="switch" style="margin:0;"><input type="checkbox" id="aLunar" disabled><span class="slider"></span></label>
+                <span style="font-size:14px;">按农历计算</span>
+                <span class="field-hint" style="margin:0;">仅「每年循环」生效；单次提醒请按公历填写</span>
+            </div>
+            <div class="form-group">
+                <label>归属家人</label>
+                <select id="aMember"><option value="">不关联</option></select>
+                <div class="field-hint">关联后可在「家庭成员」中一站式查看该家人的纪念日</div>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="aRemark" rows="2" placeholder="备注（可选）"></textarea>
+            </div>
+            <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                <label class="switch" style="margin:0;"><input type="checkbox" id="aShowHome" checked><span class="slider"></span></label>
+                <span style="font-size:14px;">首页展示</span>
+                <span class="field-hint" style="margin:0;">关闭后不再出现在首页行动流与倒计时区</span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('annModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveAnn()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('anniversaries', '纪念日');
+        let editingId = null, members = [];
+
+        function memberName(id) { const m = members.find(x => x.id === id); return m ? m.name : ''; }
+        function memberAvatarFor(id) { const m = members.find(x => x.id === id); return (window.memberAvatarHtml && m) ? memberAvatarHtml(m) : ''; }
+        async function loadMembers() {
+            const r = await apiGet('/api/family');
+            members = (r.code === 200 && r.data) ? r.data : [];
+            const sel = document.getElementById('filterMember');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">全部家人</option>' + members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+            if (cur) sel.value = cur;
+            document.getElementById('aMember').innerHTML = '<option value="">不关联</option>' +
+                members.map(m => `<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+        }
+
+        function annDays(a) {
+            const today = todayStr();
+            if (a.type === 'count-up') {
+                return { num: Math.abs(daysBetween(a.date, today)), label: '已经' };
+            }
+            // 倒计时：服务端统一计算（含农历换算）的 left 优先
+            if (a.left !== undefined && a.left !== null) {
+                return { num: Math.abs(a.left), label: a.left === 0 ? '就是今天！' : (a.left >= 0 ? '还有' : '已过') };
+            }
+            if (a.repeat === 'yearly') {
+                const next = new Date(a.date); next.setHours(0, 0, 0, 0);
+                next.setFullYear(new Date().getFullYear());
+                if (next < new Date(today + 'T00:00:00')) next.setFullYear(next.getFullYear() + 1);
+                const d = Math.floor((next - new Date(today + 'T00:00:00')) / 86400000);
+                return { num: d, label: d === 0 ? '就是今天！' : '还有' };
+            }
+            const d = daysBetween(a.date, today);
+            return { num: Math.abs(d), label: d >= 0 ? '还有' : '已过' };
+        }
+
+        const ANN_ICO = {
+            heart: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>',
+            user: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+            pen: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+            trash: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>',
+            calendar: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+        };
+        /* 存量高饱和颜色收敛为蓝系（仅渲染层映射，不改动存储数据）。
+         * 大小写归一 + 已知色补全；未命中的非蓝系一律回退品牌蓝，保证全页蓝系一致。 */
+        function annColor(c) {
+            const BLUE_SET = ['#3b82f6', '#4f7cff', '#2563eb', '#1d4ed8', '#60a5fa', '#93c5fd'];
+            if (!c) return '#3b82f6';
+            const k = String(c).toLowerCase();
+            const MAP = {
+                '#388e3c': '#3b82f6', '#4caf50': '#3b82f6', '#8bc34a': '#3b82f6', '#2e7d32': '#3b82f6',
+                '#ef6c00': '#4f7cff', '#ff9800': '#4f7cff', '#ff5722': '#4f7cff', '#f57c00': '#4f7cff',
+                '#ef4444': '#2563eb', '#f44336': '#2563eb', '#e53935': '#2563eb', '#e91e63': '#2563eb', '#d81b60': '#2563eb',
+                '#a855f7': '#4f7cff', '#9c27b0': '#4f7cff', '#673ab7': '#4f7cff', '#8e24aa': '#4f7cff',
+                '#06b6d4': '#60a5fa', '#00acc1': '#60a5fa', '#0097a7': '#60a5fa'
+            };
+            if (MAP[k]) return MAP[k];
+            return BLUE_SET.includes(k) ? k : '#3b82f6';
+        }
+        async function loadList() {
+            const r = await apiGet('/api/anniversaries');
+            const grid = document.getElementById('annGrid');
+            if (r.code !== 200) {
+                grid.innerHTML = '';
+                grid.appendChild(uiEmpty({ size: 'block', text: '加载失败，请刷新重试' }));
+                return;
+            }
+            const all = r.data || [];
+            // 顶部统计卡（基于全部数据）
+            document.getElementById('statAll').textContent = all.length;
+            document.getElementById('statHome').textContent = all.filter(a => a.showHome !== false).length;
+            document.getElementById('statSoon').textContent = all.filter(a => a.left !== null && a.left !== undefined && a.left >= 0 && a.left <= 30).length;
+            const fm = document.getElementById('filterMember').value;
+            const list = fm ? all.filter(a => String(a.memberId) === fm) : all;
+            /* 用户视角：距离最近（含今天）的排最前；left 缺失的排最后 */
+            list.sort((x, y) => (x.left === null || x.left === undefined ? 9e9 : x.left) - (y.left === null || y.left === undefined ? 9e9 : y.left));
+            if (!list.length) {
+                /* 卡片网格里放空态：必须自己跨满整行，否则会挤在第 1 格里 */
+                const box = fm
+                    ? uiEmpty({
+                        size: 'block', icon: ANN_ICO.user,
+                        title: '该家人暂无纪念日', text: '点击「+ 添加纪念日」并选择归属家人即可关联'
+                    })
+                    : uiEmpty({
+                        size: 'block', icon: ANN_ICO.heart,
+                        title: '暂无纪念日', text: '记录生日、纪念日等重要日子，自动倒数提醒',
+                        action: { text: '添加第一个纪念日', onClick: function () { showAddModal(); } }
+                    });
+                box.style.gridColumn = '1/-1';
+                grid.innerHTML = '';
+                grid.appendChild(box);
+                return;
+            }
+            grid.innerHTML = list.map(a => {
+                const { num, label } = annDays(a);
+                const color = annColor(a.color);
+                return `<div class="ann-card" data-id="${a.id}" style="background:linear-gradient(135deg,${color},${color}cc);">
+                    <div class="ann-actions">
+                        <button title="编辑" onclick="editAnn(${a.id})">${ANN_ICO.pen}</button>
+                        <button title="删除" onclick="removeAnn(${a.id})">${ANN_ICO.trash}</button>
+                    </div>
+                    <div class="ann-title">${escapeHtml(a.title)}</div>
+                    ${a.memberId ? `<div class="ann-date">${memberAvatarFor(a.memberId) || ANN_ICO.user} ${escapeHtml(memberName(a.memberId))}</div>` : ''}
+                    <div><span class="ann-days">${num}</span> <span class="ann-unit">天 ${label}</span></div>
+                    <div class="ann-date">${ANN_ICO.calendar} ${a.date}${a.repeat === 'yearly' ? (a.lunar ? '（农历·每年）' : '（每年）') : (a.lunar ? '（农历）' : '')}</div>
+                    ${a.remark ? `<div class="ann-date">${escapeHtml(a.remark)}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function showAddModal() {
+            editingId = null;
+            document.getElementById('annModalTitle').textContent = '添加纪念日';
+            document.getElementById('aTitle').value = '';
+            document.getElementById('aDate').value = todayStr();
+            document.getElementById('aType').value = 'count-down';
+            document.getElementById('aRepeat').value = 'once';
+            document.getElementById('aLunar').checked = false;
+            document.getElementById('aColor').value = '#3b82f6';
+            document.getElementById('aMember').value = document.getElementById('filterMember').value || '';
+            document.getElementById('aRemark').value = '';
+            document.getElementById('aShowHome').checked = true;
+            syncLunarSwitch();
+            openModal('annModal');
+        }
+        function syncLunarSwitch() {
+            const yearly = document.getElementById('aRepeat').value === 'yearly';
+            document.getElementById('aLunar').disabled = !yearly;
+            document.getElementById('aLunarGroup').style.opacity = yearly ? '1' : '.55';
+        }
+        async function editAnn(id) {
+            const r = await apiGet('/api/anniversaries/' + id);
+            if (r.code !== 200) return;
+            const a = r.data;
+            editingId = id;
+            document.getElementById('annModalTitle').textContent = '编辑纪念日';
+            document.getElementById('aTitle').value = a.title;
+            document.getElementById('aDate').value = a.date;
+            document.getElementById('aType').value = a.type;
+            document.getElementById('aRepeat').value = a.repeat;
+            document.getElementById('aLunar').checked = !!a.lunar;
+            document.getElementById('aColor').value = annColor(a.color);
+            document.getElementById('aMember').value = a.memberId || '';
+            document.getElementById('aRemark').value = a.remark || '';
+            document.getElementById('aShowHome').checked = a.showHome !== false;
+            syncLunarSwitch();
+            openModal('annModal');
+        }
+        async function saveAnn() {
+            const data = {
+                title: document.getElementById('aTitle').value.trim(),
+                date: document.getElementById('aDate').value,
+                type: document.getElementById('aType').value,
+                repeat: document.getElementById('aRepeat').value,
+                lunar: document.getElementById('aRepeat').value === 'yearly' && document.getElementById('aLunar').checked,
+                color: document.getElementById('aColor').value,
+                remark: document.getElementById('aRemark').value,
+                memberId: document.getElementById('aMember').value || null,
+                showHome: document.getElementById('aShowHome').checked
+                /* notify 字段已下线（全站无消费者）：不再提交，存量数据原样保留 */
+            };
+            if (!data.title || !data.date) return showToast('名称和日期不能为空', 'warning');
+            const r = editingId ? await apiPut('/api/anniversaries/' + editingId, data) : await apiPost('/api/anniversaries', data);
+            if (r.code === 200) { showToast('保存成功'); closeModal('annModal'); loadList(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function removeAnn(id) {
+            if (!(await confirmDel('确定删除该纪念日吗？'))) return;
+            const r = await apiDelete('/api/anniversaries/' + id);
+            if (r.code === 200) { showToast('删除成功'); loadList(); }
+            else showToast(r.message || '删除失败', 'error');
+        }
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        loadMembers().then(loadList);
+    </script>
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 小助手 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <style>
+        /* ===== AI 小助手（正式版 · 全页）===== */
+        .ai-layout { display: flex; gap: 16px; align-items: stretch; }
+        .ai-side {
+            width: 220px; flex-shrink: 0; background: var(--card-bg);
+            border-radius: var(--radius-lg); box-shadow: var(--shadow);
+            padding: 12px; display: flex; flex-direction: column; gap: 10px;
+            max-height: calc(100vh - 180px);
+        }
+        .ai-side-title { font-size: 12px; color: var(--text-secondary); padding: 0 4px; }
+        .ai-chat-list { overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .ai-chat-item {
+            display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+            border-radius: var(--radius); cursor: pointer; font-size: 13px;
+            color: var(--text-primary); transition: background .15s;
+        }
+        .ai-chat-item:hover { background: var(--bg-inset); }
+        .ai-chat-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+        .ai-chat-item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ai-chat-item .del {
+            opacity: 0; border: none; background: transparent; color: var(--text-secondary);
+            cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1;
+        }
+        .ai-chat-item:hover .del { opacity: 1; }
+        .ai-chat-item .del:hover { color: var(--danger); }
+        .ai-chat-item .ren {
+            opacity: 0; border: none; background: transparent; color: var(--text-secondary);
+            cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1;
+        }
+        .ai-chat-item:hover .ren { opacity: 1; }
+        .ai-chat-item .ren:hover { color: var(--primary); }
+        .ai-chat-item .t input {
+            width: 100%; font: inherit; color: inherit; background: transparent;
+            border: none; border-bottom: 1px solid var(--primary); outline: none; padding: 0;
+        }
+        .ai-chat-search {
+            width: 100%; padding: 7px 10px; margin-bottom: 2px; font-size: 13px;
+            border: 1px solid var(--border-color); border-radius: var(--radius);
+            background: var(--bg-inset); color: var(--text-primary); outline: none;
+        }
+        .ai-chat-search:focus { border-color: var(--primary); }
+        .ai-empty-side { font-size: 12px; color: var(--text-secondary); padding: 10px 4px; text-align: center; }
+
+        .ai-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+        .ai-main-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .ai-main-head .title { font-size: 14px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .chat-box { display: flex; flex-direction: column; height: calc(100vh - 250px); min-height: 380px; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 4px 4px 12px; }
+        .chat-msg .chat-bubble { max-width: min(78%, 720px); white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+        .chat-msg .chat-bubble p { margin: 0 0 8px; }
+        .chat-msg .chat-bubble p:last-child { margin-bottom: 0; }
+        .chat-msg .chat-bubble ul, .chat-msg .chat-bubble ol { margin: 0 0 8px; padding-left: 20px; }
+        .chat-msg .chat-bubble code {
+            background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 4px; font-size: 12.5px;
+        }
+        .chat-msg .chat-bubble h4 { margin: 8px 0 6px; font-size: 14px; }
+        .chat-msg .chat-bubble .md-error { color: var(--danger-text); }
+
+        /* 欢迎态 */
+        .ai-welcome { text-align: center; padding: 34px 16px 8px; }
+        .ai-welcome .bot {
+            width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 18px;
+            background: var(--primary); color: var(--text-on-primary);
+            display: flex; align-items: center; justify-content: center; font-size: 30px;
+            box-shadow: 0 6px 18px rgba(var(--primary-rgb), .3);
+        }
+        .ai-welcome h2 { font-size: 22px; margin-bottom: 6px; }
+        .ai-welcome .sub { font-size: 13px; color: var(--text-secondary); }
+        .ai-welcome .warn {
+            display: inline-flex; align-items: center; gap: 6px; margin-top: 12px;
+            font-size: 12px; color: var(--warning-text); background: rgba(245, 158, 11, .1);
+            padding: 5px 12px; border-radius: var(--radius-pill);
+        }
+        .ai-welcome .warn button { border: none; background: transparent; color: var(--primary); cursor: pointer; font-size: 12px; text-decoration: underline; }
+        .ai-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 8px 4px 12px; }
+        .ai-quick button {
+            display: flex; align-items: center; gap: 7px; justify-content: center;
+            min-height: var(--btn-h-sm); padding: 0 10px; font-size: 13px; font-family: inherit;
+            background: var(--card-bg); color: var(--text-primary);
+            border: 1px solid var(--border-color); border-radius: var(--radius); cursor: pointer;
+            transition: all .15s;
+        }
+        .ai-quick button:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+        .ai-foot { font-size: 12px; color: var(--text-secondary); text-align: center; padding: 0 0 2px; }
+
+        .chat-msg.typing .chat-bubble { display: inline-flex; gap: 4px; align-items: center; }
+        .chat-msg.typing .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-secondary); opacity: .4; animation: aiBlink 1.2s infinite; }
+        .chat-msg.typing .dot:nth-child(2) { animation-delay: .2s; }
+        .chat-msg.typing .dot:nth-child(3) { animation-delay: .4s; }
+        @keyframes aiBlink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }
+
+        @media (max-width: 900px) {
+            .ai-side { display: none; }
+            .ai-quick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chat-box { height: calc(100vh - 230px); }
+        }
+
+        /* ===== 移动端会话历史抽屉（<900px 侧栏隐藏时使用） =====
+           类名 / id 全部带 ai-mobile- 前缀，与 ai-core.js 动态创建的桌面端 #aiDrawer 体系彻底隔离。
+           样式整体限定在移动端媒体查询内，桌面端 display:none 不受影响。 */
+        #btnMobileHistory { display: none; }
+        #aiMobileDrawer, #aiMobileDrawerBackdrop { display: none; }
+        @media (max-width: 900px) {
+            #btnMobileHistory { display: inline-flex; }
+            /* 媒体查询内必须用 ID 选择器，否则特异性压不过上方的 ID 基础规则（v1.48.20 P0 修复：
+               原类选择器导致抽屉/遮罩永远 display:none，移动端历史入口完全失效） */
+            #aiMobileDrawerBackdrop {
+                position: fixed; inset: 0; background: rgba(0, 0, 0, .42);
+                z-index: 80; display: none;
+            }
+            #aiMobileDrawerBackdrop.open { display: block; }
+            #aiMobileDrawer {
+                position: fixed; top: 0; left: 0; bottom: 0; width: 280px; max-width: 84vw;
+                background: var(--card-bg); z-index: 90; display: flex; flex-direction: column; gap: 10px;
+                padding: 14px; box-shadow: 2px 0 14px rgba(0, 0, 0, .25);
+                transform: translateX(-100%); transition: transform .25s ease;
+            }
+            #aiMobileDrawer.open { transform: translateX(0); }
+            #aiMobileDrawer .drawer-head {
+                display: flex; align-items: center; justify-content: space-between; padding: 2px 4px;
+            }
+            #aiMobileDrawer .drawer-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+            #aiMobileDrawer .ai-chat-list { flex: 1; min-height: 0; overflow-y: auto; }
+        }
+
+        /* 触屏设备（v1.48.20）：快捷 chips / 会话行 / 行内操作钮补足 44px 触控热区；
+           删除/重命名按钮触屏无 hover，必须恒显，否则移动端无法管理会话 */
+        @media (pointer: coarse) {
+            .ai-quick button { min-height: 44px; }
+            .ai-chat-item { min-height: 44px; align-items: center; }
+            .ai-chat-item .del, .ai-chat-item .ren {
+                opacity: 1; min-width: 44px; min-height: 44px;
+                display: inline-flex; align-items: center; justify-content: center;
+            }
+        }
+    </style>
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <div class="ai-layout">
+            <!-- 左侧：会话列表 -->
+            <aside class="ai-side">
+                <button class="btn btn-primary" style="width:100%;" id="btnNewChat">＋ 新建对话</button>
+                <input type="search" class="ai-chat-search" id="aiChatSearch" placeholder="搜索会话标题…" aria-label="搜索会话">
+                <div class="ai-side-title">最近</div>
+                <div class="ai-chat-list" id="aiChatList"></div>
+            </aside>
+
+            <!-- 右侧：对话主区 -->
+            <div class="ai-main">
+                <div class="ai-main-head">
+                    <button class="btn btn-secondary btn-xs" id="btnMobileHistory" title="会话历史" aria-label="会话历史"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 历史</button>
+                    <span class="title" id="aiChatTitle" style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">新对话</span>
+                    <span class="ai-provider-tag none" id="aiProviderTag">未配置</span>
+                    <button class="btn btn-secondary btn-xs" id="btnNewChat2">新对话</button>
+                    <button class="btn btn-secondary btn-xs" id="btnAiCfg" title="AI 提供商设置" aria-label="AI 提供商设置"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg> 设置</button>
+                </div>
+
+                <div class="card" style="margin-bottom:0;padding:0;overflow:hidden;">
+                    <div class="chat-box">
+                        <div class="chat-messages" id="chatMessages"></div>
+                        <div class="ai-quick" id="aiQuick"></div>
+                        <div class="chat-input-bar">
+                            <input type="text" id="chatInput" placeholder="问任何问题，回车发送..." maxlength="4000" autocomplete="off" aria-label="向 AI 提问">
+                            <button class="btn btn-primary" id="btnSend">发送</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="ai-foot">AI 生成内容仅供参考，请自行核对重要信息 · 会话仅保存在本机数据库</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 移动端会话历史抽屉（<900px 侧栏隐藏时使用）；id/类名均带 ai-mobile- 前缀，避免与 ai-core.js 的 #aiDrawer 冲突 -->
+    <div class="ai-mobile-drawer-backdrop" id="aiMobileDrawerBackdrop" onclick="closeAiMobileDrawer()"></div>
+    <aside class="ai-mobile-drawer" id="aiMobileDrawer" aria-label="会话历史">
+        <div class="drawer-head">
+            <span class="drawer-title">会话历史</span>
+            <button class="btn btn-secondary btn-xs" onclick="closeAiMobileDrawer()" aria-label="关闭历史抽屉"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
+        <button class="btn btn-primary" style="width:100%;" id="btnNewChatMobile">＋ 新建对话</button>
+        <input type="search" class="ai-chat-search" id="aiChatSearchMobile" placeholder="搜索会话标题…" aria-label="搜索会话">
+        <div class="ai-side-title">最近</div>
+        <div class="ai-chat-list" id="aiChatListMobile"></div>
+    </aside>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script>
+    (function () {
+        renderShell('ai', 'AI 小助手');
+
+        const box = document.getElementById('chatMessages');
+        const input = document.getElementById('chatInput');
+        const btnSend = document.getElementById('btnSend');
+        let currentChatId = null;
+        let busy = false;
+
+        /* ---------- 快捷问题 ---------- */
+        const QUICK = [
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>', '今天任务', '帮我总结一下今天的任务和安排'],
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>', '临期物品', '有哪些东西快到期了？需要注意什么'],
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', '人情账本', '总结一下这个月的支出和人情往来'],
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>', '纪念日', '最近有哪些纪念日和生日快到了'],
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>', '循环事务', '我的循环事务里有没有逾期或快到期的'],
+            ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>', '系统概览', '给我一个家庭数据的整体概览和建议']
+        ];
+
+        function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+        function mdToHtml(s) { return AICore.mdToHtml(s); }
+
+        /* ---------- 消息渲染 ---------- */
+        function bubbleEl(role) {
+            const div = document.createElement('div');
+            div.className = 'chat-msg ' + role;
+            div.innerHTML = '<div class="chat-avatar">' + (role === 'ai' ? 'AI' : escHtml(getUsername().charAt(0).toUpperCase())) + '</div><div class="chat-bubble"></div>';
+            box.appendChild(div);
+            return div.querySelector('.chat-bubble');
+        }
+        function scrollBottom() { box.scrollTop = box.scrollHeight; }
+        function addMsg(role, text) {
+            const b = bubbleEl(role);
+            if (role === 'ai') b.innerHTML = mdToHtml(text); else b.textContent = text;
+            scrollBottom();
+            return b;
+        }
+        function addTyping() {
+            const div = document.createElement('div');
+            div.className = 'chat-msg ai typing';
+            div.innerHTML = '<div class="chat-avatar">AI</div><div class="chat-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+            box.appendChild(div); scrollBottom();
+            return div;
+        }
+
+        /* ---------- 欢迎态 / 快捷 chips ---------- */
+        function renderWelcome() {
+            const hasProvider = !!AICore.state.active;
+            box.innerHTML = '<div class="ai-welcome">'
+                + '<div class="bot"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg></div>'
+                + '<h2>嗨！' + escHtml(getUsername()) + '!</h2>'
+                + '<div class="sub">基于你的本机数据回答问题，支持多轮对话</div>'
+                + (hasProvider
+                    /* 数据外发告知：AI 已启用时才显示。以前内置 Key 是默认开启的，
+                       用户从来没做过「同意把家庭数据发给第三方」这个动作。 */
+                    ? '<div class="sub" style="font-size:12px;max-width:520px;margin:10px auto 0">提问时会把本月账本汇总、今日事务、30 天内到期事项、家人姓名与生日、近 30 天复诊计划、最近手记标题一并发往你配置的模型服务商。不想发送可在「设置 → AI」关闭总开关。</div>'
+                    : '<div class="warn"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 尚未配置 AI 提供商，<button id="welcomeCfgBtn">去配置 API Key</button></div>')
+                + '</div>';
+            const cb = document.getElementById('welcomeCfgBtn');
+            if (cb) cb.addEventListener('click', () => AICore.openSettings());
+            const q = document.getElementById('aiQuick');
+            q.style.display = '';
+            q.innerHTML = QUICK.map((x, i) => '<button data-q="' + i + '"><span>' + x[0] + '</span>' + x[1] + '</button>').join('');
+            q.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => quickAsk(QUICK[+b.dataset.q][2])));
+        }
+        function renderConversation(msgs) {
+            box.innerHTML = '';
+            msgs.forEach(m => addMsg(m.role === 'assistant' ? 'ai' : 'user', m.content));
+            // P3-1：技能 chips 常驻，多技能连续提问不再需要「新对话」找回
+            const q = document.getElementById('aiQuick');
+            if (q) q.style.display = '';
+        }
+        function renderProviderTag() {
+            const tag = document.getElementById('aiProviderTag');
+            const h = AICore.providerHealth();
+            tag.textContent = h.text;
+            tag.classList.toggle('none', !AICore.state.active);
+            tag.classList.toggle('warn', !!h.warn);   // 模型名有误 → 橙色警示（与抽屉一致）
+            if (h.warn) tag.title = '模型名无效，AI 调用会失败，点右侧「设置」修正';
+            else tag.removeAttribute('title');
+        }
+
+        /* ---------- 会话列表 ---------- */
+        let chatListCache = [];
+        function buildChatListHtml(list) {
+            if (!list.length) return '<div class="ai-empty-side">暂无历史对话</div>';
+            const penSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+            const delSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+            return list.map(c =>
+                '<div class="ai-chat-item' + (c.id === currentChatId ? ' active' : '') + '" data-id="' + c.id + '">'
+                + '<span class="t">' + escHtml(c.title || '新对话') + '</span>'
+                + '<button class="ren" data-ren="' + c.id + '" title="重命名" aria-label="重命名会话">' + penSvg + '</button>'
+                + '<button class="del" data-del="' + c.id + '" title="删除" aria-label="删除会话">' + delSvg + '</button></div>'
+            ).join('');
+        }
+        function bindChatList(el) {
+            el.querySelectorAll('.ai-chat-item').forEach(item => {
+                item.addEventListener('click', e => {
+                    if (e.target.closest('input')) return;
+                    if (e.target.dataset.del) { deleteChat(+e.target.dataset.del); return; }
+                    if (e.target.dataset.ren) { renameChat(+e.target.dataset.ren); return; }
+                    openChat(+item.dataset.id);
+                    closeAiMobileDrawer();
+                });
+            });
+        }
+        /* 行内重命名会话 */
+        function renameChat(id) {
+            const item = document.querySelector('.ai-chat-item[data-id="' + id + '"] .t');
+            if (!item || item.querySelector('input')) return;
+            const old = item.textContent.trim();
+            item.innerHTML = '<input type="text" maxlength="30" value="' + escHtml(old) + '" aria-label="会话新名称">';
+            const input = item.querySelector('input');
+            input.focus(); input.select();
+            let done = false;
+            const finish = () => { done = true; loadChatList(); };
+            const save = async () => {
+                if (done) return; done = true;
+                const v = input.value.trim();
+                if (!v || v === old) return finish();
+                const r = await apiPut('/api/ai/chats/' + id, { title: v });
+                if (r.code !== 200) { showToast(r.message || '重命名失败', 'error'); return finish(); }
+                showToast('已重命名');
+                if (id === currentChatId) { const t = document.getElementById('aiChatTitle'); if (t) t.textContent = v; }
+                loadChatList();
+            };
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') save();
+                else if (e.key === 'Escape') finish();
+            });
+            input.addEventListener('blur', save);
+        }
+        async function loadChatList() {
+            const r = await apiGet('/api/ai/chats');
+            chatListCache = (r && r.data) || [];
+            const s1 = document.getElementById('aiChatSearch'), s2 = document.getElementById('aiChatSearchMobile');
+            const key = ((s1 && s1.value) || (s2 && s2.value) || '').trim().toLowerCase();
+            const list = key ? chatListCache.filter(c => (c.title || '').toLowerCase().includes(key)) : chatListCache;
+            const html = buildChatListHtml(list);
+            document.getElementById('aiChatList').innerHTML = html;
+            bindChatList(document.getElementById('aiChatList'));
+            const mob = document.getElementById('aiChatListMobile');
+            if (mob) { mob.innerHTML = html; bindChatList(mob); }
+        }
+        /* 移动端历史抽屉（id/类名带 ai-mobile- 前缀，与 ai-core.js 桌面端 #aiDrawer 隔离） */
+        function openAiMobileDrawer() {
+            document.getElementById('aiMobileDrawer').classList.add('open');
+            document.getElementById('aiMobileDrawerBackdrop').classList.add('open');
+        }
+        function closeAiMobileDrawer() {
+            document.getElementById('aiMobileDrawer').classList.remove('open');
+            document.getElementById('aiMobileDrawerBackdrop').classList.remove('open');
+        }
+        async function openChat(id) {
+            if (busy) return;
+            const r = await apiGet('/api/ai/chats/' + id);
+            if (!r || r.code !== 200) return;
+            currentChatId = id;
+            document.getElementById('aiChatTitle').textContent = r.data.title || '新对话';
+            renderConversation(r.data.messages || []);
+            loadChatList();
+        }
+        async function deleteChat(id) {
+            if (!(await confirmDel('删除这条会话？'))) return;
+            await apiDelete('/api/ai/chats/' + id);
+            if (currentChatId === id) { currentChatId = null; document.getElementById('aiChatTitle').textContent = '新对话'; renderWelcome(); }
+            loadChatList();
+        }
+        function newChat() {
+            if (busy) return;
+            currentChatId = null;
+            document.getElementById('aiChatTitle').textContent = '新对话';
+            renderWelcome();
+            loadChatList();
+            input.focus();
+        }
+
+        /* ---------- 发送（复用共享内核的 SSE 流式客户端） ---------- */
+        async function quickAsk(q) {
+            if (busy) return;
+            // 欢迎态（无当前会话）：优先续接最近一条历史会话，无历史则保持新建
+            if (!currentChatId) {
+                try {
+                    const r = await apiGet('/api/ai/chats');
+                    const list = (r && r.data) || [];
+                    if (list.length) { await openChat(list[0].id); }   // list 已按 updatedAt 倒序
+                } catch (e) { /* 拉取失败：按新建处理 */ }
+            }
+            input.value = q;
+            sendMsg();
+        }
+
+        async function sendMsg() {
+            const text = input.value.trim();
+            if (!text || busy) return;
+            busy = true; btnSend.disabled = true;
+            input.value = '';
+
+            /* 仅清掉欢迎态：演示模式（未配 Key）下 currentChatId 恒为 null，
+               若按 !currentChatId 判断会把上一轮问答一并清掉（v1.48.20 修复） */
+            if (box.querySelector('.ai-welcome')) box.innerHTML = '';
+            document.getElementById('aiQuick').style.display = 'none';
+            addMsg('user', text);
+
+            // 未配置提供商：演示模式兜底 + 配置引导
+            if (!AICore.state.active) {
+                const t = addTyping();
+                await new Promise(r => setTimeout(r, 420));
+                t.remove();
+                addMsg('ai', localReply(text)
+                    + '\n\n💡 我是演示模式。点右上角 **⚙️ 设置** 填入 DeepSeek / 通义千问 / 豆包 的 API Key，即可启用真正的 AI 回答。');
+                busy = false; btnSend.disabled = false; input.focus();
+                return;
+            }
+
+            const t = addTyping();
+            let bubble = null, replyBuf = '', streamErr = false;
+            try {
+                await AICore.stream({
+                    message: text, chatId: currentChatId,
+                    onMeta: j => {
+                        currentChatId = j.chatId;
+                        document.getElementById('aiChatTitle').textContent = j.title || '新对话';
+                        const tag = document.getElementById('aiProviderTag');
+                        tag.textContent = (j.provider || '') + ' · ' + (j.model || '');
+                        tag.classList.remove('none');
+                    },
+                    onDelta: (d, full) => {
+                        if (!bubble) { t.remove(); bubble = bubbleEl('ai'); }
+                        replyBuf = full;
+                        bubble.innerHTML = mdToHtml(replyBuf);
+                        scrollBottom();
+                    },
+                    onError: msg => {
+                        streamErr = true;
+                        if (t.parentNode) t.remove();
+                        addMsg('ai', '❌ ' + msg + (replyBuf ? '\n\n（已保留部分回复）' : ''));
+                    }
+                });
+                if (bubble) { bubble.innerHTML = mdToHtml(replyBuf); scrollBottom(); }
+                if (!replyBuf) {
+                    if (t.parentNode) t.remove();
+                    // 流正常结束但没有任何内容（也未触发 error 事件）：前端兜底提示
+                    if (!streamErr) addMsg('ai', '⚠️ 模型未返回内容，请重试');
+                }
+                loadChatList();
+            } catch (e) {
+                if (t.parentNode) t.remove();
+                addMsg('ai', '❌ 网络异常：' + (e && e.message ? e.message : e));
+            }
+            busy = false; btnSend.disabled = false; input.focus();
+        }
+
+        /* ---------- 演示模式兜底（未配置 Key 时） ---------- */
+        function localReply(text) {
+            const t = text.toLowerCase();
+            const now = new Date();
+            if (/今天|几号|日期|星期/.test(t)) return '今天是 ' + formatFullTime(now) + '，' + greetingOf(now.getHours()) + '！';
+            if (/农历/.test(t)) return '今天是 ' + lunarStrOf(now) + '。';
+            if (/到期|临期|过期/.test(t)) return '去「证件效期」可以看到所有物品的到期倒计时，首页也会自动提示 30 天内到期的物品。';
+            if (/账|支出|收入|人情/.test(t)) return '「家庭账本」记录日常收支，「人情记账」的人情往来会自动汇入总账。';
+            if (/纪念日|生日/.test(t)) return '「纪念日」和「家庭成员」都会做 30 天内倒计时提醒，首页直接可见。';
+            if (/贷|利息|月供/.test(t)) return '去「贷款计算」新增贷款方案，支持等额本息/等额本金逐期明细。';
+            if (/密码|证件|保单/.test(t)) return '「保险库」支持 AES 加密存储密码、证件号、保单号、会员卡号。';
+            if (/笔记|手记|富文本/.test(t)) return '「备忘手记」现在是富文本编辑器，支持标题、列表、引用，选中文字还能让 AI 直接润色/扩写/精简/翻译。';
+            if (/悬浮|全局|任意页面/.test(t)) return '右下角的 🤖 悬浮入口在任意页面都能唤起我，也可以点抽屉里的页面快捷动作。';
+            if (/功能|能做什么|帮助/.test(t)) return '我有这些功能模块：生活驾驶舱、一次性事务、循环事务、备忘手记、家庭成员、纪念日、家庭账本、人情记账、证件效期、位置轨迹日记、我的足迹、保险库、贷款计算。';
+            if (/你好|hi|hello|在吗/.test(t)) return greetingOf(now.getHours()) + '！有什么可以帮你的？';
+            return '这个问题我（演示模式）暂时答不上来。';
+        }
+
+        /* ---------- 绑定 ---------- */
+        document.getElementById('btnNewChat').addEventListener('click', newChat);
+        ['aiChatSearch', 'aiChatSearchMobile'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('input', loadChatList);
+        });
+        document.getElementById('btnNewChat2').addEventListener('click', newChat);
+        document.getElementById('btnAiCfg').addEventListener('click', () => AICore.openSettings());
+        document.getElementById('btnMobileHistory').addEventListener('click', openAiMobileDrawer);
+        document.getElementById('btnNewChatMobile').addEventListener('click', () => { closeAiMobileDrawer(); newChat(); });
+        btnSend.addEventListener('click', sendMsg);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } });
+
+        /* ---------- 初始化 ---------- */
+        (async () => {
+            await loadAiCore();          // AI 内核由 common.js 异步加载，此处等待就绪
+            /* renderShell 挂载内核时已拉取过配置，避免 /api/ai/config 首屏重复请求（v1.48.20） */
+            if (!AICore.state.cfg) await AICore.loadProviders();
+            /* 仅无会话时刷新欢迎态：否则关掉设置弹窗会把正在查看的会话视图冲掉（v1.48.20 修复） */
+            AICore.setProviderChangeHandler(() => { renderProviderTag(); if (!currentChatId) renderWelcome(); });
+            renderWelcome();
+            renderProviderTag();
+            await loadChatList();
+            input.focus();
+        })();
+    })();
+    </script>
+</body>
+</html>

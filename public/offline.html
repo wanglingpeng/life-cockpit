@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>离线 - 生活驾驶舱</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:#f1f5f9; color:#334155; }
+  .card { text-align:center; padding:40px 32px; max-width:340px; }
+  .icon { font-size:52px; margin-bottom:12px; }
+  h1 { font-size:19px; margin:0 0 8px; }
+  p { font-size:14px; color:#475569; line-height:1.7; margin:0 0 22px; }   /* v1.48.37：原 #64748b 压 #f1f5f9 仅 4.34 → #475569 得 6.92 */
+  button { border:none; border-radius:10px; padding:11px 30px; font-size:15px; font-weight:600;
+           background:#2563eb; color:#fff; cursor:pointer; }                /* v1.48.37：原 #3b82f6 白字 3.68 → #2563eb 得 5.17 */
+  button:active { opacity:.85; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#0f172a; color:#e2e8f0; }
+    p { color:#94a3b8; }
+  }
+</style>
+
+
+</head>
+<body>
+  <div class="card">
+    <div class="icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1"/></svg></div>
+    <h1>当前离线</h1>
+    <p>无法连接到驾驶舱服务。<br>已缓存的页面仍可从主页进入；恢复网络后点击下方按钮重试。</p>
+    <button onclick="location.replace('/dashboard')">重试</button>
+  </div>
+</body>
+</html>

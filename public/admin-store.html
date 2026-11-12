@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>版本与规划 - 生活驾驶舱</title>
+<link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+<link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+<style>
+  /* === 更新日志页（参考图重做：白底 + 低透明彩色几何装饰 + 左右两列：左更新日志/右版本规划） === */
+  .chlog-page { position:relative; max-width:100%; background:#fff; border-radius:16px; border:1px solid var(--border); padding:32px 36px 40px; overflow:hidden; }
+  /* 左右低透明彩色几何装饰（内联 SVG，不喧宾夺主） */
+  .chlog-deco { position:absolute; pointer-events:none; z-index:0; opacity:.5; }
+  .chlog-deco.tl { top:-40px; left:-30px; }
+  .chlog-deco.br { bottom:-50px; right:-20px; }
+  .chlog-layout { position:relative; z-index:1; display:grid; grid-template-columns:1.5fr 1fr; gap:36px; align-items:start; }
+  @media (max-width:960px){ .chlog-layout{ grid-template-columns:1fr; } }
+  .chlog-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:18px; }
+  .chlog-head .title { font-size:22px; font-weight:800; color:var(--text-primary); letter-spacing:1px; }
+  .chlog-head .cnt { font-size:13px; color:var(--text-secondary); }
+  .chlog-list { }
+  .chlog-item { display:flex; align-items:center; gap:12px; padding:13px 2px; border-bottom:1px solid #f1f5f9; }
+  .chlog-item:last-child{ border-bottom:none; }
+  .chlog-badge { flex-shrink:0; min-width:44px; text-align:center; font-size:12px; font-weight:600; padding:4px 8px; border-radius:8px; }
+  .chlog-badge.feat{ background:rgba(59,130,246,.12); color:#1d4ed8; }   /* v1.48.37：原 #2563eb 压 12% 蓝底只有 4.33 → 5.61 */
+  .chlog-badge.fix{ background:rgba(239,68,68,.12); color:#b91c1c; }
+  .chlog-badge.style{ background:rgba(245,158,11,.14); color:#92400e; }
+  .chlog-badge.other{ background:rgba(100,116,139,.14); color:#475569; }
+  .chlog-title{ flex:1; min-width:0; font-size:14px; line-height:1.55; color:var(--text-primary); }
+  .chlog-right{ flex-shrink:0; display:flex; align-items:center; gap:10px; }
+  .chlog-time{ font-size:12.5px; color:var(--text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .chlog-today{ background:rgba(59,130,246,.12); color:#1d4ed8; font-size:12px; padding:2px 9px; border-radius:10px; flex-shrink:0; font-weight:600; }
+  /* 滚动加载：固定高度容器 + sentinel + 底部状态提示 */
+  .chlog-scroll { max-height: min(74vh, 760px); overflow-y:auto; border-radius:10px; padding-right:6px; }
+  .chlog-scroll::-webkit-scrollbar{ width:6px; }
+  .chlog-scroll::-webkit-scrollbar-thumb{ background:rgba(79,124,255,.3); border-radius:3px; }
+  .chlog-sentinel{ height:1px; }
+  .chlog-status{ text-align:center; font-size:12.5px; color:var(--text-secondary); padding:14px 0 4px; }
+
+  /* 右：版本规划 */
+  .ver-plan-list { display:flex; flex-direction:column; gap:14px; }
+  .ver-card { border:1px solid #eef2f7; border-radius:12px; padding:14px 16px; background:#fcfdff; }
+  .ver-card .ver-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .ver-card .ver-name { font-size:15px; font-weight:700; color:var(--text-primary); }
+  .ver-state { font-size:12px; font-weight:600; padding:3px 10px; border-radius:10px; }
+  .ver-state.done{ background:rgba(16,185,129,.14); color:#047857; }
+  .ver-state.plan{ background:rgba(245,158,11,.16); color:#92400e; }
+  .ver-list { margin:0; padding:0; list-style:none; }
+  .ver-list li { display:flex; align-items:flex-start; gap:8px; font-size:13px; line-height:1.5; color:var(--text-primary); padding:4px 0; }
+  .ver-list li::before { content:""; flex-shrink:0; width:5px; height:5px; border-radius:50%; background:#cbd5e1; margin-top:8px; }
+  .ver-tag-next { flex-shrink:0; margin-left:4px; font-size:11px; color:#475569; background:rgba(100,116,139,.12); padding:1px 7px; border-radius:8px; }
+  /* v1.48.37：以上徽标是「浅 tint 底 + 深色字」，亮色下正常；但暗色下 tint 仍偏深，
+     深色字压上去只有 1.91–3.03。暗色统一换亮档文字，实测 4.90–6.97（底为 tint 叠 #1e293b 卡片面）。 */
+  [data-theme="dark"] .chlog-badge.feat  { color: #60a5fa; }   /* 4.93 */
+  [data-theme="dark"] .chlog-badge.fix   { color: #fca5a5; }   /* 6.97 */
+  [data-theme="dark"] .chlog-badge.style { color: #fbbf24; }   /* 6.89 */
+  [data-theme="dark"] .chlog-badge.other { color: #94a3b8; }   /* 4.90 */
+  [data-theme="dark"] .chlog-today       { color: #60a5fa; }   /* 4.93 */
+  [data-theme="dark"] .ver-state.done    { color: #4ade80; }   /* 6.68 */
+  [data-theme="dark"] .ver-state.plan    { color: #fbbf24; }   /* 6.58 */
+  [data-theme="dark"] .ver-tag-next      { color: #94a3b8; }   /* 5.04 */
+  @media (max-width:640px){
+    .chlog-page{ padding:22px 16px 28px; }
+    .chlog-head .title{ font-size:19px; }
+    .chlog-item{ flex-wrap:wrap; gap:8px 12px; }
+    .chlog-right{ width:100%; justify-content:flex-end; }
+  }
+</style>
+
+
+</head>
+<body>
+<div id="pageContent" class="page-container chlog-page">
+  <!-- 低透明彩色几何装饰 -->
+  <svg class="chlog-deco tl" width="220" height="220" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <circle cx="60" cy="60" r="50" fill="rgba(59,130,246,.10)"/>
+    <circle cx="150" cy="40" r="26" fill="rgba(168,85,247,.10)"/>
+    <rect x="30" y="120" width="60" height="60" rx="14" fill="rgba(245,158,11,.10)"/>
+  </svg>
+  <svg class="chlog-deco br" width="220" height="220" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <rect x="20" y="20" width="70" height="70" rx="16" fill="rgba(16,185,129,.10)"/>
+    <circle cx="150" cy="140" r="46" fill="rgba(59,130,246,.10)"/>
+    <circle cx="60" cy="160" r="22" fill="rgba(239,68,68,.08)"/>
+  </svg>
+
+  <div class="chlog-layout">
+    <!-- 左：更新日志（固定高度独立滚动容器） -->
+    <div>
+      <div class="chlog-head">
+        <span class="title">更新日志</span>
+        <span class="cnt" id="chlogCnt">加载中…</span>
+      </div>
+      <div class="chlog-scroll" id="chlogScroll">
+        <div class="chlog-list" id="chlogList"></div>
+        <div class="chlog-sentinel" id="chlogSentinel" aria-hidden="true"></div>
+      </div>
+    </div>
+
+    <!-- 右：版本规划 -->
+    <div>
+      <div class="chlog-head">
+        <span class="title">版本规划</span>
+        <span class="cnt" id="verPlanCnt"></span>
+      </div>
+      <div class="ver-plan-list" id="verPlanList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/common.js?v=1.48.54"></script>
+<script src="/js/lunar.js?v=1.48.54"></script>
+<script src="/js/voice.js?v=1.48.54"></script>
+<script src="/js/pwa.js?v=1.48.54"></script>
+<script src="/js/telemetry.js?v=1.48.54"></script>
+
+<script>
+renderShell('admin-store', '版本与规划');
+
+// ---------- 更新日志（固定容器滚动加载：首批15条，每批15条；时间戳取完整 YYYY-MM-DD HH:MM:SS） ----------
+const _todayIso = new Date().toISOString().slice(0,10);
+const PAGE_SIZE = 15;
+let chTotal = 0, chLoaded = 0, chLoading = false, chDone = false, chObserver = null, chScrollEl = null;
+function fmtStamp(iso) {
+  if (!iso) return '';
+  const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})/);
+  return m ? (m[1] + ' ' + m[2]) : String(iso);
+}
+function renderItem(c) {
+  const day = String(c.date || '').slice(0, 10);
+  const isToday = day === _todayIso;
+  return '<div class="chlog-item">'
+    + '<div class="chlog-badge ' + c.type + '">' + c.badge + '</div>'
+    + '<div class="chlog-title">' + escapeHtml(c.title) + '</div>'
+    + '<div class="chlog-right">'
+    + (isToday ? '<span class="chlog-today">今日</span>' : '')
+    + '<span class="chlog-time">' + fmtStamp(c.date) + '</span>'
+    + '</div></div>';
+}
+function setStatus(txt) {
+  let el = document.getElementById('chlogStatus');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'chlogStatus';
+    el.className = 'chlog-status';
+    document.getElementById('chlogSentinel').after(el);
+  }
+  el.textContent = txt;
+}
+async function loadChangelogBatch() {
+  if (chLoading || chDone) return;
+  chLoading = true;
+  setStatus('加载中…');
+  try {
+    const r = await apiGet('/api/changelog?offset=' + chLoaded + '&limit=' + PAGE_SIZE);
+    const data = (r && r.data) || { list: [] };
+    const list = data.list || [];
+    chTotal = data.total || list.length;
+    document.getElementById('chlogCnt').textContent = '共 ' + chTotal + ' 条记录';
+    if (chLoaded === 0 && !list.length) {
+      document.getElementById('chlogList').innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:30px;">暂无更新记录</div>';
+      chDone = true;
+      setStatus('');
+      return;
+    }
+    let html = '';
+    list.forEach(c => { html += renderItem(c); });
+    document.getElementById('chlogList').insertAdjacentHTML('beforeend', html);
+    chLoaded += list.length;
+    if (chLoaded >= chTotal || list.length < PAGE_SIZE) {
+      chDone = true;
+      setStatus('— 已显示全部 ' + chTotal + ' 条 —');
+      if (chObserver) { chObserver.disconnect(); chObserver = null; }
+      if (chScrollEl) { chScrollEl.removeEventListener('scroll', onChlogScroll); chScrollEl = null; }
+    } else {
+      setStatus('');
+    }
+  } catch (e) {
+    setStatus('加载失败');
+  } finally {
+    chLoading = false;
+    // 若 sentinel 仍在容器可视区（上一批加载时 IO 已触发但被 chLoading 拦截），继续加载
+    if (!chDone && chObserver) {
+      const c = document.getElementById('chlogScroll');
+      const s = document.getElementById('chlogSentinel');
+      if (c && s) {
+        const cr = c.getBoundingClientRect();
+        const sr = s.getBoundingClientRect();
+        if (sr.top < cr.bottom + 80) loadChangelogBatch();
+      }
+    }
+  }
+}
+function onChlogScroll() {
+  if (chLoading || chDone) return;
+  const c = document.getElementById('chlogScroll');
+  if (!c) return;
+  if (c.scrollTop + c.clientHeight >= c.scrollHeight - 80) loadChangelogBatch();
+}
+function initChangelogInfinite() {
+  loadChangelogBatch();
+  const c = document.getElementById('chlogScroll');
+  const sentinel = document.getElementById('chlogSentinel');
+  if (!c || !sentinel) return;
+  // 三路触发：IO（root=容器）+ 容器 scroll 事件 + finally 几何兜底；防重入由 chLoading/chDone 保证
+  // scroll 事件在程序化 scrollTop 与真实滚动时都同步触发，是 IO 被节流时的可靠兜底
+  c.addEventListener('scroll', onChlogScroll, { passive: true });
+  chScrollEl = c;
+  const io = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) loadChangelogBatch();
+  }, { root: c, rootMargin: '0px 0px 80px 0px' });
+  io.observe(sentinel);
+  chObserver = io;
+}
+
+// ---------- 右：版本规划（页内常量，按版本整理；状态：已发布/规划中/下期） ----------
+const VERSION_PLAN = [
+  { ver: 'v1.48.0', state: 'plan', stateText: '规划中', items: [
+    { t: '微信小程序端（H5 功能整体迁移到小程序）' },
+    { t: '穿戴设备同步（心率/睡眠/步数汇入健康看板）' },
+    { t: '家庭共享日历（家人生日/预约自动同步）' },
+    { t: '暗色模式与无障碍全站优化', next: true }
+  ]},
+  { ver: 'v1.47.0', state: 'done', stateText: '已发布', items: [
+    { t: '位置轨迹页面并入全站浅色视觉（地图保留深色）' },
+    { t: '驾驶舱今日聚合标签区分待办/循环事务' },
+    { t: '健康档案家人头像以固定色+名字首字区分' },
+    { t: '更新日志页按新设计重做（完整时间戳）' }
+  ]},
+  { ver: 'v1.46.0', state: 'done', stateText: '已发布', items: [
+    { t: '侧边栏补齐 6 个高频模块入口' },
+    { t: '模块命名统一（一次性/循环事务、轨迹记录等）' },
+    { t: '全局 UI 修复（SVG 泄漏/安装提示/账本红绿/家底口径）' },
+    { t: '周期提醒每月支持 1-31 号自动回退月末' },
+    { t: 'AI 一句话记录两阶段确认预览' },
+    { t: '保险库老条目类型/健康快捷卡修复' }
+  ]}
+];
+
+function renderVersionPlan() {
+  let html = '';
+  let done = 0, plan = 0;
+  VERSION_PLAN.forEach(v => {
+    if (v.state === 'done') done++; else plan++;
+    let items = '';
+    v.items.forEach(it => {
+      items += '<li>' + escapeHtml(it.t) + (it.next ? '<span class="ver-tag-next">下期</span>' : '') + '</li>';
+    });
+    html += '<div class="ver-card">'
+      + '<div class="ver-head"><span class="ver-name">' + v.ver + '</span>'
+      + '<span class="ver-state ' + v.state + '">' + v.stateText + '</span></div>'
+      + '<ul class="ver-list">' + items + '</ul></div>';
+  });
+  document.getElementById('verPlanList').innerHTML = html;
+  document.getElementById('verPlanCnt').textContent = VERSION_PLAN.length + ' 个版本 · ' + done + ' 已发布 ' + plan + ' 规划中';
+}
+
+initChangelogInfinite();
+renderVersionPlan();
+</script>
+</body>
+</html>

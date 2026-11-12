@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>组件库 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* ===== 本页专属：只是「画布」，不定义任何组件样式 =====
+         * 组件的样子全部来自 /css/components.css，这里一个色值都不写，
+         * 否则预览就不再是真实组件了（改组件改不到预览上，预览也不敢信）。 */
+
+        /* 说明条 */
+        .g-intro {
+            background: var(--primary-light); border-left: 3px solid var(--primary);
+            border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px;
+            font-size: 13px; line-height: 1.7; color: var(--text-primary);
+        }
+        .g-intro code {
+            background: var(--bg-inset); border-radius: 4px; padding: 1px 5px;
+            font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        .g-intro b { font-weight: 600; }
+
+        /* 分组卡 */
+        .g-sec { margin-bottom: 16px; }
+        .g-desc {
+            margin: 0 0 10px; font-size: 12.5px; line-height: 1.7;
+            color: var(--text-secondary);
+        }
+        .g-desc code {
+            background: var(--bg-inset); border-radius: 4px; padding: 1px 5px;
+            font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--text-primary);
+        }
+
+        /* 画布：给组件一个与真实卡片一致的底色与留白 */
+        .g-stage {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+            padding: 16px; border: 1px dashed var(--border-color);
+            border-radius: var(--radius); background: var(--bg-secondary);
+        }
+        .g-stage > .g-block { flex: 1 1 220px; min-width: 0; }
+
+        /* 把两个 position:fixed 的组件放进画布——只改定位，不碰外观。
+         * 不改的话它们会盖住整页（遮罩 inset:0 / 下拉 fixed），预览就看不到解剖结构。 */
+        .g-stage .c-modal-mask {
+            position: static; inset: auto; padding: 24px; border-radius: var(--radius);
+            animation: none;
+        }
+        .g-stage .c-dp-pop {
+            position: static; inset: auto; margin: 0 auto; animation: none;
+        }
+
+        /* 代码片段 */
+        .g-code { margin-top: 10px; }
+        .g-code > summary {
+            cursor: pointer; font-size: 12.5px; color: var(--primary-text);
+            min-height: 32px; display: flex; align-items: center; width: fit-content;
+        }
+        .g-code pre {
+            margin: 6px 0 0; padding: 12px; overflow-x: auto;
+            background: var(--bg-inset); border-radius: var(--radius);
+            font-size: 12px; line-height: 1.6;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--text-primary);
+        }
+
+        /* 交互演示区 */
+        .g-live { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .g-live-out {
+            margin-top: 12px; padding: 12px; border-radius: var(--radius);
+            background: var(--bg-inset); font-size: 12.5px; color: var(--text-secondary);
+        }
+        .g-live-out:empty { display: none; }
+    </style>
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+
+        <div class="g-intro">
+            <b>这一页是 <code>public/css/components.css</code> 的唯一活样例。</b>
+            每个 <code>c-*</code> 组件在这里都有一份真实标记 + 可复制的代码片段，
+            片段由页面自己从 DOM 里生成，不会与样例跑偏。
+            <br>
+            <code>tests/design-system.test.js</code> 断言：<code>components.css</code> 里定义的每一个
+            <code>c-*</code> 类，都必须在本页的 <code>class</code> 属性里出现——
+            新增组件不补样例，<code>npm test</code> 就红。删掉组件不删样例，同样红。
+            <br>
+            想看别的主题色或暗色下的样子：用顶栏的主题切换，本页会跟着变（组件只吃 <code>var()</code> 令牌）。
+        </div>
+
+        <!-- ==================== 按钮 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">按钮 <code>c-btn</code></span>
+            </div>
+            <p class="g-desc">
+                <code>.c-btn</code> 自带 44px 触控高度与 <code>:focus-visible</code> 焦点环；
+                <code>.c-btn-primary</code> 用品牌渐变、<code>.c-btn-danger</code> 用 <code>--danger</code>。
+                禁用态统一走 <code>:disabled</code>（降透明 + 灰度），不要自己调 opacity。
+            </p>
+            <div class="g-stage" data-snippet>
+                <button class="c-btn" type="button">次要操作</button>
+                <button class="c-btn c-btn-primary" type="button">主要操作</button>
+                <button class="c-btn c-btn-danger" type="button">危险操作</button>
+                <button class="c-btn" type="button" disabled>已禁用</button>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 弹窗 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">弹窗 <code>c-modal</code></span>
+            </div>
+            <p class="g-desc">
+                结构固定为 <code>mask &gt; card &gt; head(title + x) / body / foot</code>。
+                <code>.c-modal-sm</code>（360px）与 <code>.c-modal-lg</code>（640px）只改宽度；
+                640px 以下自动转底部抽屉、按钮竖排——这是组件内置的，页面不要重复写媒体查询。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="c-modal-mask">
+                    <div class="c-modal-card">
+                        <div class="c-modal-head">
+                            <span class="c-modal-title">编辑家庭成员</span>
+                            <button class="c-modal-x" type="button" aria-label="关闭">×</button>
+                        </div>
+                        <div class="c-modal-body">
+                            姓名、生日、关系三项必填；生日用于纪念日倒数与农历提醒。
+                        </div>
+                        <div class="c-modal-foot">
+                            <button class="c-btn" type="button">取消</button>
+                            <button class="c-btn c-btn-primary" type="button">保存</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+            <p class="g-desc" style="margin-top:12px;">
+                尺寸变体（<code>.c-modal-card</code> 默认 460px）：
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="c-modal-card c-modal-sm">
+                    <div class="c-modal-head"><span class="c-modal-title">小卡 360px</span></div>
+                    <div class="c-modal-body">单句确认、轻量提示。</div>
+                </div>
+                <div class="c-modal-card c-modal-lg">
+                    <div class="c-modal-head"><span class="c-modal-title">大卡 640px</span></div>
+                    <div class="c-modal-body">表单较多时用，例如批量导入的字段映射。</div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 空态 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">空态 <code>c-empty</code></span>
+            </div>
+            <p class="g-desc">
+                分两种，别混用：<b>行内空态</b>用于列表某一行或表单字段下方，只回答「这里为什么空」，
+                一句话就够；<b>块级空态</b>用于卡片正文整块为空，要同时回答「这是什么空」和「怎么开始」，
+                所以有标题 + 描述两级。图标走 24×24 / stroke 2 /
+                <code>currentColor</code> / <code>aria-hidden</code> 五件套，不要用 emoji。
+                <code>.c-empty-action</code> 的命中区已补到 44px；块级动作直接复用 <code>.c-btn</code>。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="c-empty">
+                    <span class="c-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></span>
+                    <span class="c-empty-text">还没有任何记录，添加第一条试试</span>
+                    <button class="c-empty-action" type="button">+ 添加记录</button>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+
+            <div class="g-stage" data-snippet>
+                <div class="c-empty c-empty-block">
+                    <span class="c-empty-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                    <span class="c-empty-title">暂无笔记</span>
+                    <span class="c-empty-text">随手记录想法与待办，支持富文本与 AI 助手</span>
+                    <button class="c-btn c-btn-primary" type="button">新建第一条笔记</button>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 标签 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">标签 <code>c-chip</code></span>
+            </div>
+            <p class="g-desc">
+                用于「已选中的多值」，例如分类、成员、标签。<code>.c-chip-x</code> 视觉 20px，
+                但 <code>::after</code> 把命中区扩到 44px——不要为了好点就把视觉尺寸改大。
+                只读场景不要放 <code>.c-chip-x</code>。
+            </p>
+            <div class="g-stage" data-snippet>
+                <span class="c-chip"><span class="c-chip-text">家庭</span><button class="c-chip-x" type="button" aria-label="移除「家庭」">×</button></span>
+                <span class="c-chip"><span class="c-chip-text">健康</span><button class="c-chip-x" type="button" aria-label="移除「健康」">×</button></span>
+                <span class="c-chip"><span class="c-chip-text">仅展示（无移除）</span></span>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 统计卡 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">统计卡 <code>c-stat</code></span>
+            </div>
+            <p class="g-desc">
+                <code>.c-stat-num</code> 用 <code>font-variant-numeric: tabular-nums</code>，
+                数字列才能对齐。<code>.c-stat-delta</code> 必须配 <code>.c-up</code> /
+                <code>.c-down</code> / <code>.c-flat</code> 之一，颜色由财务色令牌决定。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="c-stat g-block">
+                    <span class="c-stat-label">本月支出</span>
+                    <span class="c-stat-num">¥ 4,280.00</span>
+                    <span class="c-stat-delta c-down">↓ 12% 较上月</span>
+                </div>
+                <div class="c-stat g-block">
+                    <span class="c-stat-label">本月收入</span>
+                    <span class="c-stat-num">¥ 12,600.00</span>
+                    <span class="c-stat-delta c-up">↑ 3% 较上月</span>
+                </div>
+                <div class="c-stat g-block">
+                    <span class="c-stat-label">结余</span>
+                    <span class="c-stat-num">¥ 8,320.00</span>
+                    <span class="c-stat-delta c-flat">与上月持平</span>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 骨架屏 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">骨架屏 <code>c-skel</code></span>
+            </div>
+            <p class="g-desc">
+                只给高度和宽度，扫光与圆角由组件提供；1.4s 循环，<code>prefers-reduced-motion</code>
+                下由 <code>theme/</code> 全局降级为静态。骨架的尺寸要贴合真实内容，
+                否则加载完会跳一下——那比不做骨架更难受。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="g-block">
+                    <div class="c-skel" style="height:14px;width:55%;"></div>
+                    <div class="c-skel" style="height:14px;width:82%;margin-top:8px;"></div>
+                    <div class="c-skel" style="height:44px;width:100%;margin-top:10px;"></div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 表单行 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">表单行 <code>c-form-row</code></span>
+            </div>
+            <p class="g-desc">
+                <code>.c-form-row</code> 是网格容器（标签在上、控件在下），
+                <code>.c-field</code> 包住真正的控件并统一 44px 高与焦点环。
+                控件本身不要加 <code>style="height:…"</code>——高度由组件定。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="g-block">
+                    <div class="c-form-row">
+                        <label class="c-label" for="dsName">名称</label>
+                        <div class="c-field"><input id="dsName" type="text" value="体检报告 2026"></div>
+                    </div>
+                    <div class="c-form-row">
+                        <label class="c-label" for="dsType">类型</label>
+                        <div class="c-field">
+                            <select id="dsType">
+                                <option>健康</option>
+                                <option>证件</option>
+                                <option>家电</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="c-form-row" style="margin-bottom:0;">
+                        <label class="c-label" for="dsNote">备注</label>
+                        <div class="c-field"><textarea id="dsNote" rows="2">复查项目：血压、血脂。</textarea></div>
+                    </div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 分段标题 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">分段标题 <code>c-section-row</code></span>
+            </div>
+            <p class="g-desc">
+                标题 + 右侧「更多」。<code>.c-section-more</code> 的命中区同样扩到 44px，
+                视觉上仍是一行 12.5px 的文字链接。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="g-block">
+                    <div class="c-section-row">
+                        <span class="c-section-title">最近添加</span>
+                        <a class="c-section-more" href="/notes">全部</a>
+                    </div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 日期选择器 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">日期选择器 <code>c-dp-*</code></span>
+            </div>
+            <p class="g-desc">
+                由 <code>public/js/ui.js</code> 的 <code>uiDatepicker</code> 自动升级：
+                它扫描 <code>input[type=date]</code>，在 640px 以下隐藏原生控件
+                （<code>.c-dp-native</code>，仅作真实值载体）并换成下面的假控件 + 下拉日历。
+                桌面端不升级，直接用原生控件——所以页面上必须放的是
+                <code>&lt;input type="date"&gt;</code>，不是 <code>type="text"</code>。
+            </p>
+            <div class="g-stage" data-snippet>
+                <div class="g-block">
+                    <div class="c-dp-wrap">
+                        <input class="c-dp-native" type="text" aria-hidden="true" tabindex="-1" readonly>
+                        <input class="c-dp-fake" type="text" value="2026-10-23" readonly aria-label="选择日期">
+                        <button class="c-dp-ico" type="button" aria-label="打开日历">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+            <p class="g-desc" style="margin-top:12px;">下拉日历的解剖结构：</p>
+            <div class="g-stage" data-snippet>
+                <div class="c-dp-pop">
+                    <div class="c-dp-head">
+                        <button class="c-dp-nav" type="button" aria-label="上个月">‹</button>
+                        <span class="c-dp-title">2026 年 10 月</span>
+                        <button class="c-dp-nav" type="button" aria-label="下个月">›</button>
+                    </div>
+                    <div class="c-dp-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+                    <div class="c-dp-grid">
+                        <button class="c-dp-day out" type="button">27</button>
+                        <button class="c-dp-day out" type="button">28</button>
+                        <button class="c-dp-day out" type="button">29</button>
+                        <button class="c-dp-day out" type="button">30</button>
+                        <button class="c-dp-day" type="button">1</button>
+                        <button class="c-dp-day" type="button">2</button>
+                        <button class="c-dp-day" type="button">3</button>
+                        <button class="c-dp-day" type="button">4</button>
+                        <button class="c-dp-day" type="button">5</button>
+                        <button class="c-dp-day" type="button">6</button>
+                        <button class="c-dp-day" type="button">7</button>
+                        <button class="c-dp-day" type="button">8</button>
+                        <button class="c-dp-day" type="button">9</button>
+                        <button class="c-dp-day" type="button">10</button>
+                        <button class="c-dp-day" type="button">11</button>
+                        <button class="c-dp-day" type="button">12</button>
+                        <button class="c-dp-day" type="button">13</button>
+                        <button class="c-dp-day" type="button">14</button>
+                        <button class="c-dp-day" type="button">15</button>
+                        <button class="c-dp-day" type="button">16</button>
+                        <button class="c-dp-day" type="button">17</button>
+                        <button class="c-dp-day" type="button">18</button>
+                        <button class="c-dp-day" type="button">19</button>
+                        <button class="c-dp-day" type="button">20</button>
+                        <button class="c-dp-day" type="button">21</button>
+                        <button class="c-dp-day" type="button">22</button>
+                        <button class="c-dp-day today" type="button">23</button>
+                        <button class="c-dp-day" type="button">24</button>
+                        <button class="c-dp-day" type="button">25</button>
+                        <button class="c-dp-day" type="button">26</button>
+                        <button class="c-dp-day" type="button">27</button>
+                        <button class="c-dp-day" type="button">28</button>
+                        <button class="c-dp-day" type="button">29</button>
+                        <button class="c-dp-day" type="button">30</button>
+                        <button class="c-dp-day sel" type="button">31</button>
+                    </div>
+                    <div class="c-dp-foot">
+                        <button class="c-dp-btn" type="button">清空</button>
+                        <button class="c-dp-btn" type="button">此刻</button>
+                        <button class="c-dp-btn c-dp-ok" type="button">确定</button>
+                    </div>
+                </div>
+            </div>
+            <details class="g-code"><summary>标记片段</summary><pre><code></code></pre></details>
+        </div>
+
+        <!-- ==================== 交互演示 ==================== -->
+        <div class="card g-sec">
+            <div class="card-header">
+                <span class="card-title">交互演示（走真实工厂）</span>
+            </div>
+            <p class="g-desc">
+                上面的样例是静态标记，方便看结构；下面这些按钮调用
+                <code>public/js/ui.js</code> 的真实工厂，输出与线上代码完全同源。
+                如果两者长得不一样，说明工厂和 CSS 已经分叉了——那正是这一页要暴露的问题。
+            </p>
+            <div class="g-live">
+                <button class="c-btn c-btn-primary" type="button" id="gOpenModal">uiModal 标准</button>
+                <button class="c-btn" type="button" id="gOpenModalSm">uiModal 小卡</button>
+                <button class="c-btn" type="button" id="gOpenConfirm">uiConfirm</button>
+                <button class="c-btn" type="button" id="gRenderEmpty">uiEmpty</button>
+                <button class="c-btn" type="button" id="gRenderChip">uiChip</button>
+                <button class="c-btn" type="button" id="gRenderStat">uiStat</button>
+            </div>
+            <div class="g-live-out" id="gLiveOut"></div>
+
+            <p class="g-desc" style="margin-top:14px;">
+                真实日期输入（<code>uiDatepicker</code> 会在 640px 以下自动升级）：
+            </p>
+            <div class="g-live">
+                <input type="date" id="gDate" style="min-height:44px;padding:10px 12px;border:1px solid var(--border-color);border-radius:var(--radius);background:var(--input-bg);color:var(--text-primary);font:inherit;font-size:14px;">
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        (function () {
+            'use strict';
+
+            /* 挂公共壳。#pageContent 在源码里是 display:none，由 renderShell 揭开并搬进
+               .content-area —— 全站每个业务页都在自己的内联脚本里调这一句，
+               漏了就白屏（冒烟测试会抓：#pageContent 不应被隐藏）。 */
+            renderShell('design-system', '组件库');
+
+            /* ---------- 代码片段：从 DOM 生成，保证片段与样例永不跑偏 ----------
+             * 手写片段一定会过时（改了样例忘改片段），所以片段不落库，
+             * 每次打开本页从画布里读 outerHTML 再缩进。 */
+            function pretty(html) {
+                /* 只做「标签前换行 + 按层级缩进」这一件事：
+                   属性不拆行，文本保持原样，避免把长属性列表炸成几十行。 */
+                var src = html.replace(/>\s*</g, '><').trim();
+                var out = '', depth = 0, i = 0;
+                while (i < src.length) {
+                    var lt = src.indexOf('<', i);
+                    if (lt < 0) { out += src.slice(i); break; }
+                    if (lt > i) {
+                        var text = src.slice(i, lt).trim();
+                        if (text) out += '\n' + '  '.repeat(depth) + text;
+                    }
+                    var gt = src.indexOf('>', lt);
+                    if (gt < 0) { out += src.slice(lt); break; }
+                    var tag = src.slice(lt, gt + 1);
+                    var closing = /^<\//.test(tag);
+                    var selfClose = /\/>$/.test(tag);
+                    if (closing) depth = Math.max(0, depth - 1);
+                    out += '\n' + '  '.repeat(depth) + tag;
+                    if (!closing && !selfClose) {
+                        /* 自闭合的空元素（input/br/img 等）没有结束标签，不加深层级 */
+                        var name = (tag.match(/^<([a-zA-Z][\w-]*)/) || [])[1] || '';
+                        if (!/^(input|br|img|hr|meta|link|source|area|col|embed|param|track|wbr)$/i.test(name)) depth++;
+                    }
+                    i = gt + 1;
+                }
+                return out.replace(/^\n/, '');
+            }
+
+            document.querySelectorAll('[data-snippet]').forEach(function (stage) {
+                /* 片段跟紧它自己那块画布：一个分组里可能有多块画布（弹窗有标准卡与尺寸变体、
+                   日期选择器有假控件与下拉日历），按「分组内第一块」取会让后一块覆盖前一块。 */
+                var next = stage.nextElementSibling;
+                var slot = next && next.classList.contains('g-code')
+                    ? next.querySelector('pre code') : null;
+                if (slot) slot.textContent = pretty(stage.innerHTML);
+            });
+
+            /* ---------- 交互演示：真实工厂 ---------- */
+            var out = document.getElementById('gLiveOut');
+
+            function say(html) { out.innerHTML = html; }
+
+            document.getElementById('gOpenModal').addEventListener('click', function () {
+                uiModal({
+                    title: '编辑家庭成员',
+                    body: '这是 uiModal 的真实输出。移动端会自动变成底部抽屉，按钮竖排。',
+                    actions: [
+                        { label: '取消' },
+                        { label: '保存', kind: 'primary', onClick: function () { say('uiModal 的「保存」被点击了。'); } }
+                    ]
+                });
+            });
+
+            document.getElementById('gOpenModalSm').addEventListener('click', function () {
+                uiModal({
+                    title: '小卡 360px',
+                    body: '单句确认、轻量提示用这个尺寸。',
+                    size: 'sm',
+                    actions: [{ label: '知道了', kind: 'primary' }]
+                });
+            });
+
+            document.getElementById('gOpenConfirm').addEventListener('click', function () {
+                uiConfirm('确定要删除这条记录吗？删除后不可恢复。', { danger: true })
+                    .then(function (ok) { say(ok ? 'uiConfirm 返回 true（已确认）' : 'uiConfirm 返回 false（已取消）'); });
+            });
+
+            document.getElementById('gRenderEmpty').addEventListener('click', function () {
+                out.textContent = '';
+                out.appendChild(uiEmpty({
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+                    text: 'uiEmpty 工厂渲染的空态',
+                    action: { text: '去添加', onClick: function () { say('uiEmpty 的 action 被点击了。'); } }
+                }));
+            });
+
+            document.getElementById('gRenderChip').addEventListener('click', function () {
+                out.textContent = '';
+                var wrap = document.createElement('div');
+                ['家庭', '健康', '财务'].forEach(function (t) {
+                    wrap.appendChild(uiChip(t, { onClose: function () { say('uiChip 的「' + t + '」被移除了。'); } }));
+                });
+                out.appendChild(wrap);
+            });
+
+            document.getElementById('gRenderStat').addEventListener('click', function () {
+                out.textContent = '';
+                var wrap = document.createElement('div');
+                wrap.style.display = 'flex';
+                wrap.style.gap = '24px';
+                wrap.appendChild(uiStat({ label: '本月支出', value: '¥ 4,280.00', delta: '↓ 12%', tone: 'down' }));
+                wrap.appendChild(uiStat({ label: '本月收入', value: '¥ 12,600.00', delta: '↑ 3%', tone: 'up' }));
+                wrap.appendChild(uiStat({ label: '结余', value: '¥ 8,320.00', delta: '持平', tone: 'flat' }));
+                out.appendChild(wrap);
+            });
+        })();
+    </script>
+</body>
+</html>

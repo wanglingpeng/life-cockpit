@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贷款计算 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- 方案列表 -->
+        <div id="listView">
+            <div class="card-header" style="margin-bottom:16px;">
+                <span class="card-title" style="font-size:16px;">贷款计算</span>
+                <button class="btn btn-primary btn-xs" onclick="showCreateWizard()">+ 新增贷款</button>
+            </div>
+            <div class="ann-grid" id="mortgageGrid"></div>
+        </div>
+
+        <!-- 详情视图 -->
+        <div id="detailView" style="display:none;">
+            <div class="card-header" style="margin-bottom:16px;">
+                <button class="btn btn-secondary btn-xs" onclick="backToList()">‹ 返回列表</button>
+                <div style="margin-left:auto;display:flex;gap:8px;">
+                    <button class="btn btn-secondary btn-xs" onclick="openEdit(current.id)" title="编辑贷款方案"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg> 编辑方案</button>
+                    <button class="btn btn-danger btn-xs" onclick="deleteMortgage()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> 删除方案</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title" id="detailName">--</span>
+                    <span class="status-tag" id="detailMethod" style="background:var(--primary-light);color:var(--primary);"></span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;font-size:13px;color:var(--text-secondary);">
+                    <div>贷款本金<br><b style="color:var(--text-primary);font-size:15px;" id="dPrincipal"></b></div>
+                    <div>年利率<br><b style="color:var(--text-primary);font-size:15px;" id="dRate"></b></div>
+                    <div>贷款年限<br><b style="color:var(--text-primary);font-size:15px;" id="dYears"></b></div>
+                    <div>开始日期<br><b style="color:var(--text-primary);font-size:15px;" id="dStart"></b></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">还款概览</span>
+                </div>
+                <div class="mortgage-summary" id="mortgageSummary"></div>
+                <div id="piBarWrap" style="margin-top:14px;"></div>
+                <div class="table-wrap">
+                    <table class="data-table" id="detailTable">
+                        <thead id="detailHead"></thead>
+                        <tbody id="detailBody"></tbody>
+                    </table>
+                </div>
+                <div style="margin-top:18px;border-top:1px dashed var(--border-color);padding-top:14px;">
+                    <div style="font-weight:600;font-size:14px;margin-bottom:8px;">提前还款模拟</div>
+                    <div class="form-inline" style="align-items:center;">
+                        <label style="font-size:13px;color:var(--text-secondary);">还款
+                            <input type="number" id="ppAmt" min="0.1" step="0.1" placeholder="金额" style="width:90px;"> 万元
+                        </label>
+                        <label style="font-size:13px;color:var(--text-secondary);">在第
+                            <input type="number" id="ppAt" min="1" step="1" placeholder="期数" style="width:70px;"> 期后
+                        </label>
+                        <select id="ppMode" style="width:auto;">
+                            <option value="shorten">缩短期数</option>
+                            <option value="reduce">减少月供</option>
+                        </select>
+                        <button class="btn btn-primary btn-sm" onclick="runPrepay()">模拟</button>
+                    </div>
+                    <div id="ppResult" style="margin-top:8px;font-size:13px;color:var(--text-secondary);">输入金额与期数后点击「模拟」，估算可节省的利息。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增贷款 -->
+    <div id="mtModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="mtModalTitle">新增贷款方案</h3>
+                <button class="modal-close" onclick="closeModal('mtModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>方案名称 *</label>
+                <input type="text" id="mName" placeholder="如：房贷-首套">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>贷款本金（万元）*</label>
+                    <input type="number" id="mPrincipal" min="0.1" step="0.1" placeholder="100">
+                </div>
+                <div class="form-group">
+                    <label>年利率（%）*</label>
+                    <input type="number" id="mRate" min="0" step="0.01" placeholder="3.6">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>贷款年限 *</label>
+                    <input type="number" id="mYears" min="1" max="100" placeholder="30">
+                </div>
+                <div class="form-group">
+                    <label>还款方式</label>
+                    <select id="mMethod">
+                        <option value="equal-payment">等额本息</option>
+                        <option value="equal-principal">等额本金</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="mStart">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('mtModal')">取消</button>
+                <button class="btn btn-primary" id="mtSaveBtn" onclick="saveMortgage()">保存并计算</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('mortgage', '贷款计算');
+        let list = [], current = null, editingId = null;
+
+        async function loadList() {
+            const r = await apiGet('/api/mortgage');
+            if (r.code !== 200) return;
+            list = r.data;
+            const grid = document.getElementById('mortgageGrid');
+            if (!list.length) {
+                /* 卡片网格里放空态：必须自己跨满整行，否则会挤在第 1 格里 */
+                const box = uiEmpty({
+                    size: 'block',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+                    title: '暂无贷款方案', text: '录入贷款信息，自动计算月供、利息与还款计划',
+                    action: { text: '新增第一个方案', onClick: function () { showCreateWizard(); } }
+                });
+                box.style.gridColumn = '1/-1';
+                grid.innerHTML = '';
+                grid.appendChild(box);
+                return;
+            }
+            grid.innerHTML = list.map(m => {
+                const calc = compute(m);
+                return `<div class="card" style="margin-bottom:0;cursor:pointer;" onclick="showDetail(${m.id})">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-weight:600;font-size:15px;">${escapeHtml(m.name)}</span>
+                        <span style="display:flex;align-items:center;gap:6px;">
+                            <span class="status-tag" style="background:var(--primary-light);color:var(--primary);">${m.method === 'equal-payment' ? '等额本息' : '等额本金'}</span>
+                            <button class="icon-btn" type="button" title="编辑贷款方案" aria-label="编辑贷款方案" style="border:none;background:transparent;color:var(--primary);cursor:pointer;padding:4px;" onclick="event.stopPropagation();openEdit(${m.id})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+                        </span>
+                    </div>
+                    <div style="font-size:13px;color:var(--text-secondary);line-height:1.9;">
+                        本金 <b style="color:var(--text-primary);">${fmtMoney(m.principal * 10000)}</b><br>
+                        利率 <b style="color:var(--text-primary);">${m.annualRate}%</b> · ${m.years}年<br>
+                        月供约 <b style="color:var(--primary);">${fmtMoney(calc.firstMonth)}</b><br>
+                        总利息约 <b style="color:var(--danger);">${fmtMoney(calc.totalInterest)}</b>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        /* 核心计算 */
+        function compute(m) {
+            const P = m.principal * 10000;
+            const r = m.annualRate / 100 / 12;
+            const n = m.years * 12;
+            if (m.method === 'equal-payment') {
+                const monthly = r > 0 ? P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1) : P / n;
+                const totalPay = monthly * n;
+                return { firstMonth: monthly, totalInterest: totalPay - P, totalPay, rows: [], monthly };
+            }
+            // 等额本金
+            const mp = P / n;
+            const firstMonth = mp + P * r;
+            let totalInterest = 0;
+            const rows = [];
+            let remain = P;
+            for (let i = 1; i <= n; i++) {
+                const interest = remain * r;
+                totalInterest += interest;
+                rows.push({ month: i, payment: mp + interest, principal: mp, interest, remain: remain - mp });
+                remain -= mp;
+            }
+            return { firstMonth, totalInterest, totalPay: P + totalInterest, rows };
+        }
+
+        function showDetail(id) {
+            current = list.find(x => x.id === id);
+            if (!current) return;
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
+            document.getElementById('detailName').textContent = current.name;
+            document.getElementById('detailMethod').textContent = current.method === 'equal-payment' ? '等额本息' : '等额本金';
+            document.getElementById('dPrincipal').textContent = fmtMoney(current.principal * 10000);
+            document.getElementById('dRate').textContent = current.annualRate + '%';
+            document.getElementById('dYears').textContent = current.years + ' 年';
+            document.getElementById('dStart').textContent = current.startDate;
+            renderDetail();
+        }
+        /* 本息构成占比条 */
+        function renderPiBar(calc) {
+            const P = current.principal * 10000;
+            const I = Math.max(0, calc.totalInterest);
+            const pct = (P + I) > 0 ? P / (P + I) * 100 : 50;
+            document.getElementById('piBarWrap').innerHTML =
+                '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">还款构成：本金 ' + fmtMoney(P) + '（' + pct.toFixed(1) + '%） · 利息 ' + fmtMoney(I) + '（' + (100 - pct).toFixed(1) + '%）</div>'
+                + '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg-inset);" role="img" aria-label="本金与利息占比">'
+                + '<div style="width:' + pct + '%;background:var(--primary);"></div>'
+                + '<div style="flex:1;background:var(--danger);"></div></div>';
+            const n = current.years * 12;
+            document.getElementById('ppAt').value = Math.min(12, n - 1);
+            document.getElementById('ppAmt').value = '';
+            document.getElementById('ppResult').innerHTML = '输入金额与期数后点击「模拟」，估算可节省的利息。';
+        }
+        /* 提前还款模拟：第 k 期后一次还 A 元，缩期 / 减月供两种方式（估算值） */
+        function runPrepay() {
+            const P = current.principal * 10000;
+            const r = current.annualRate / 100 / 12;
+            const n = current.years * 12;
+            const A = parseFloat(document.getElementById('ppAmt').value) * 10000;
+            const k = parseInt(document.getElementById('ppAt').value, 10) || 0;
+            const mode = document.getElementById('ppMode').value;
+            const out = document.getElementById('ppResult');
+            const hint = m => { out.innerHTML = '<span style="color:var(--warning);">' + m + '</span>'; };
+            if (!(A > 0)) return hint('请输入提前还款金额');
+            if (k < 1 || k >= n) return hint('期数需在 1 ~ ' + (n - 1) + ' 之间');
+
+            /* 第 k 期后的剩余本金与不提前还时的剩余利息 */
+            let remain, restInterest, mp;
+            if (current.method === 'equal-payment') {
+                const M = compute(current).monthly;
+                remain = r > 0
+                    ? P * (Math.pow(1 + r, n) - Math.pow(1 + r, k)) / (Math.pow(1 + r, n) - 1)
+                    : P - (P / n) * k;
+                restInterest = M * (n - k) - remain;
+            } else {
+                mp = P / n;
+                remain = P - mp * k;
+                restInterest = compute(current).rows.slice(k).reduce((s, x) => s + x.interest, 0);
+            }
+            if (A > remain) return hint('还款金额不能超过第 ' + k + ' 期后剩余本金 ' + fmtMoney(remain));
+            /* R：提前还款后真正参与后续计算的剩余本金 */
+            const R = Math.max(0, remain - A);
+
+            let n2, I2, M2, modeTxt;
+            if (R <= 0) {
+                n2 = 0; I2 = 0; M2 = 0;
+                modeTxt = '一次性结清剩余本金，后续无需再还款';
+            } else if (current.method === 'equal-payment') {
+                const M = compute(current).monthly;
+                if (mode === 'shorten') {
+                    if (r > 0) {
+                        if (M <= R * r) return hint('当前月供不足以覆盖剩余本金利息，无法缩期');
+                        n2 = Math.ceil(Math.log(M / (M - R * r)) / Math.log(1 + r));
+                    } else {
+                        n2 = Math.ceil(R / M);
+                    }
+                    I2 = Math.max(0, M * n2 - R);
+                    M2 = M;
+                    modeTxt = '期数缩至约 ' + n2 + ' 期（' + (n2 / 12).toFixed(1) + ' 年），月供保持 ' + fmtMoney(M) + ' 不变（末期可能更少）';
+                } else {
+                    n2 = n - k;
+                    M2 = r > 0 ? R * r * Math.pow(1 + r, n2) / (Math.pow(1 + r, n2) - 1) : R / n2;
+                    I2 = Math.max(0, M2 * n2 - R);
+                    modeTxt = '期数不变（' + n2 + ' 期），月供降至约 ' + fmtMoney(M2);
+                }
+            } else {
+                /* 等额本金：每月还本金固定，利息按各期期初余额线性递减 */
+                if (mode === 'shorten') {
+                    n2 = Math.ceil(R / mp); /* 缩期保持每月本金 mp 不变 */
+                    I2 = r * (n2 * R - mp * n2 * (n2 - 1) / 2);
+                    M2 = mp + R * r;
+                    modeTxt = '期数缩至约 ' + n2 + ' 期（' + (n2 / 12).toFixed(1) + ' 年），首月约 ' + fmtMoney(M2) + '（逐月递减）';
+                } else {
+                    n2 = n - k;
+                    const mp2 = R / n2; /* 减供：剩余期数内摊薄每月本金 */
+                    I2 = r * (n2 * R - mp2 * n2 * (n2 - 1) / 2);
+                    M2 = mp2 + R * r;
+                    modeTxt = '期数不变（' + n2 + ' 期），首月约 ' + fmtMoney(M2) + '（逐月递减）';
+                }
+                I2 = Math.max(0, I2);
+            }
+            const save = Math.max(0, restInterest - I2);
+            out.innerHTML = '还 ' + fmtMoney(A) + ' 后剩余本金 <b>' + fmtMoney(R) + '</b>，' + modeTxt
+                + '<br>剩余利息约 <b style="color:var(--danger);">' + fmtMoney(I2) + '</b>（不提前还约为 ' + fmtMoney(restInterest) + '）'
+                + '<br>预计节省利息 <b style="color:var(--amount-in);">' + fmtMoney(save) + '</b>'
+                + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">* 估算值未考虑利率调整、还款日宽限等因素，仅供参考。</div>';
+        }
+
+        function renderDetail() {
+            const calc = compute(current);
+            renderPiBar(calc);
+            const summary = document.getElementById('mortgageSummary');
+            const head = document.getElementById('detailHead');
+            const body = document.getElementById('detailBody');
+            if (current.method === 'equal-payment') {
+                summary.innerHTML = `
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.monthly)}</div><div class="l">每月月供（固定）</div></div>
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.totalInterest)}</div><div class="l">利息总额</div></div>
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.totalPay)}</div><div class="l">还款总额</div></div>`;
+                head.innerHTML = '<tr><th>期数</th><th>月供</th><th>本金</th><th>利息</th><th>剩余本金</th></tr>';
+                // 等额本息逐期展开
+                const P = current.principal * 10000, r = current.annualRate / 100 / 12, n = current.years * 12;
+                let remain = P, rowsHtml = '';
+                for (let i = 1; i <= n; i++) {
+                    const interest = remain * r;
+                    const principal = calc.monthly - interest;
+                    remain = Math.max(0, remain - principal);
+                    rowsHtml += `<tr><td>第${i}期</td><td>${fmtMoney(calc.monthly)}</td><td>${fmtMoney(principal)}</td><td>${fmtMoney(interest)}</td><td>${fmtMoney(remain)}</td></tr>`;
+                }
+                body.innerHTML = rowsHtml;
+            } else {
+                summary.innerHTML = `
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.rows[0].payment)}</div><div class="l">首月月供（递减）</div></div>
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.rows[calc.rows.length - 1].payment)}</div><div class="l">末月月供</div></div>
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.totalInterest)}</div><div class="l">利息总额</div></div>
+                    <div class="ms-item"><div class="v">${fmtMoney(calc.totalPay)}</div><div class="l">还款总额</div></div>`;
+                head.innerHTML = '<tr><th>期数</th><th>月供</th><th>本金</th><th>利息</th><th>剩余本金</th></tr>';
+                body.innerHTML = calc.rows.map(row =>
+                    `<tr><td>第${row.month}期</td><td>${fmtMoney(row.payment)}</td><td>${fmtMoney(row.principal)}</td><td>${fmtMoney(row.interest)}</td><td>${fmtMoney(Math.max(0, row.remain))}</td></tr>`
+                ).join('');
+            }
+        }
+        function backToList() {
+            document.getElementById('detailView').style.display = 'none';
+            document.getElementById('listView').style.display = 'block';
+        }
+
+        function showCreateWizard() {
+            editingId = null;
+            document.getElementById('mtModalTitle').textContent = '新增贷款方案';
+            document.getElementById('mtSaveBtn').textContent = '保存并计算';
+            ['mName', 'mPrincipal', 'mRate'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('mYears').value = 30;
+            document.getElementById('mMethod').value = 'equal-payment';
+            document.getElementById('mStart').value = todayStr();
+            openModal('mtModal');
+        }
+        function openEdit(id) {
+            const item = list.find(x => x.id === id);
+            if (!item) return;
+            editingId = item.id;
+            document.getElementById('mtModalTitle').textContent = '编辑贷款方案';
+            document.getElementById('mtSaveBtn').textContent = '保存修改';
+            document.getElementById('mName').value = item.name || '';
+            document.getElementById('mPrincipal').value = item.principal;
+            document.getElementById('mRate').value = item.annualRate;
+            document.getElementById('mYears').value = item.years;
+            document.getElementById('mMethod').value = item.method === 'equal-principal' ? 'equal-principal' : 'equal-payment';
+            document.getElementById('mStart').value = item.startDate || todayStr();
+            openModal('mtModal');
+        }
+        async function saveMortgage() {
+            const data = {
+                name: document.getElementById('mName').value.trim(),
+                principal: +document.getElementById('mPrincipal').value,
+                annualRate: +document.getElementById('mRate').value,
+                years: +document.getElementById('mYears').value,
+                method: document.getElementById('mMethod').value,
+                startDate: document.getElementById('mStart').value
+            };
+            if (!data.name || !(data.principal > 0)) {
+                return showToast('请填写完整贷款信息', 'warning');
+            }
+            if (!(data.annualRate >= 0 && data.annualRate <= 100)) {
+                return showToast('年利率需在 0~100% 之间', 'warning');
+            }
+            if (!(data.years >= 1 && data.years <= 100)) {
+                return showToast('贷款年限需在 1~100 年之间', 'warning');
+            }
+            if (editingId) {
+                const r = await apiPut('/api/mortgage/' + editingId, data);
+                if (r.code === 200) { showToast('已更新'); closeModal('mtModal'); editingId = null; await loadList(); showDetail(r.data.id); }
+                else showToast(r.message || '更新失败', 'error');
+            } else {
+                const r = await apiPost('/api/mortgage', data);
+                if (r.code === 200) { showToast('已保存'); closeModal('mtModal'); await loadList(); showDetail(r.data.id); }
+                else showToast(r.message || '保存失败', 'error');
+            }
+        }
+        async function deleteMortgage() {
+            if (!current) return;
+            if (!(await confirmDel('确定删除该贷款方案？'))) return;
+            await apiDelete('/api/mortgage/' + current.id);
+            showToast('删除成功');
+            backToList(); loadList();
+        }
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        loadList();
+    </script>
+</body>
+</html>

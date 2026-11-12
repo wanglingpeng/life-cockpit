@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭成员 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* ===== F1 重构：薄荷健康式家人档案布局（只重排 DOM/内嵌 CSS，数据逻辑不动） ===== */
+        /* FIX-33 保留：删除按钮降级为小号文字链，不与主按钮同权重，降低误触 */
+        .member-del-link {
+            border: none; background: transparent; cursor: pointer;
+            color: var(--text-secondary); font-size: 12px; line-height: 1;
+            padding: 6px 4px; text-decoration: underline; text-underline-offset: 2px; opacity: .8;
+            min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center;
+        }
+        .member-del-link:hover, .member-del-link:focus { color: var(--danger); opacity: 1; }
+
+        /* 顶部家人头像横滑切换 */
+        .fam-rail {
+            display: flex; gap: 14px; overflow-x: auto; padding: 6px 2px 10px;
+            scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        .fam-rail::-webkit-scrollbar { display: none; }
+        .fam-rail-item {
+            flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 5px;
+            background: none; border: none; cursor: pointer; padding: 0; min-width: 60px; min-height: 44px;
+        }
+        .fam-avatar {
+            width: 56px; height: 56px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px; border: 2px solid transparent; transition: transform .15s;
+        }
+        .fam-rail-item.active .fam-avatar {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(99,102,241,.18);
+        }
+        .fam-rail-item .dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+        .fam-rail-item.active .dot { background: #3b82f6; }
+        .fam-rail-name { font-size: 12px; color: var(--text-secondary); max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fam-rail-item.active .fam-rail-name { color: var(--text-primary); font-weight: 600; }
+        .fam-rail-add {
+            width: 56px; height: 56px; border-radius: 50%; border: 2px dashed var(--border-color);
+            background: var(--card-bg); color: var(--text-secondary); font-size: 26px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .fam-rail-add:active { transform: scale(.95); }
+
+        /* 卡通头像选择器网格 */
+        .avatar-chip {
+            display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+            width: 56px; padding: 4px 2px; border-radius: 10px; cursor: pointer;
+            border: 2px solid transparent; background: var(--card-bg);
+        }
+        .avatar-chip img {
+            width: 44px; height: 44px; border-radius: 50%; object-fit: cover; display: block;
+        }
+        .avatar-chip-name { font-size: 11px; color: var(--text-secondary); line-height: 1; }
+        .avatar-chip.pill {
+            border-color: #3b82f6; background: rgba(59,130,246,.08);
+            box-shadow: 0 0 0 2px rgba(59,130,246,.18);
+        }
+        .avatar-chip.pill .avatar-chip-name { color: var(--primary-text); font-weight: 600; }
+        .avatar-img {
+            width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;
+        }
+
+        /* 工具条：筛选 tabs + 说明 */
+        .fam-toolbar { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; flex-wrap: wrap; }
+        .fam-toolbar .mini-tabs { margin-left: auto; }
+
+        /* 当前成员概览大卡 */
+        .fam-overview { padding: 18px 16px; border-radius: 18px; margin-bottom: 14px; }
+        .fam-overview-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .fam-overview-head .member-avatar { width: 48px; height: 48px; font-size: 24px; flex: 0 0 auto; }
+        .fam-overview-name { font-size: 18px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+        .fam-overview-rel { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .fam-overview-actions { margin-left: auto; display: flex; gap: 4px; align-items: center; flex: 0 0 auto; }
+        .fam-pills { display: flex; gap: 10px; row-gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .fam-biggrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+        .fam-bigcell { text-align: center; padding: 6px 2px; min-width: 0; }
+        .fam-biglabel { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+        .fam-bigvalue { font-size: 19px; font-weight: 700; color: var(--text-primary); line-height: 1.1; word-break: keep-all; }
+        .fam-bigvalue .unit { font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+        .fam-bigvalue.empty { font-size: 14px; font-weight: 400; color: var(--text-secondary); }
+
+        /* 分组圆角大卡：标题左侧品牌色竖条 */
+        .sec-card { background: var(--card-bg); border-radius: 18px; padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow); }
+        .sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .sec-bar { width: 4px; height: 16px; border-radius: 2px; background: var(--grad-bar); flex: 0 0 auto; }
+        .sec-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+        .sec-count { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+
+        /* 空状态：暂无数据 + 轻量添加按钮 */
+        .fam-empty { text-align: center; padding: 16px 8px; }
+        .fam-empty .txt { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+        .fam-empty .btn-sm-add {
+            display: inline-block; font-size: 13px; padding: 7px 18px; border-radius: 999px;
+            border: 1px dashed var(--border-color); color: var(--text-secondary); background: transparent; cursor: pointer;
+            min-height: 44px;
+        }
+        .fam-empty .btn-sm-add:active { background: var(--bg-inset); }
+
+        /* 详情行 */
+        .drow { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .drow:last-child { border-bottom: none; }
+        .drow .k { color: var(--text-secondary); flex: 0 0 auto; }
+        .drow .v { color: var(--text-primary); text-align: right; word-break: break-word; }
+
+        /* ===== 创建/编辑成员：极简列表式弹层（底部大胶囊完成） ===== */
+        .modal.sheet-modal { display: flex; flex-direction: column; max-height: 92vh; padding-bottom: 0; }
+        .sheet-list { padding: 4px 0; flex: 1; overflow-y: auto; }
+        .sheet-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            padding: 14px 4px; border-bottom: 1px solid var(--border-color); min-height: 48px;
+        }
+        .sheet-row:last-child { border-bottom: none; }
+        .sheet-row .lbl { font-size: 15px; color: var(--text-primary); flex: 0 0 auto; }
+        .sheet-row .lbl.req::after { content: ' *'; color: var(--danger); }
+        .sheet-row .val { flex: 1; text-align: right; min-width: 0; }
+        .sheet-row input, .sheet-row select, .sheet-row textarea {
+            width: 100%; max-width: 230px; border: none; background: transparent; text-align: right;
+            font-size: 15px; color: var(--text-primary); outline: none; font-family: inherit;
+        }
+        .sheet-row textarea { text-align: left; min-height: 40px; resize: vertical; }
+        .sheet-row input::placeholder, .sheet-row textarea::placeholder { color: var(--text-secondary); }
+        .sheet-row input[type="date"] { text-align: right; }
+        .sheet-picker { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+        .sheet-hint { font-size: 12px; color: var(--text-secondary); padding: 10px 4px 0; }
+        .sheet-foot { padding: 12px 0 4px; }
+        .fab-complete {
+            width: 100%; padding: 14px; border-radius: 999px; border: none; cursor: pointer;
+            background: var(--grad-brand); background-size: 200% 100%; color: #fff;
+            font-size: 16px; font-weight: 600; min-height: 48px;
+        }
+
+        /* 移动端首屏微调（保留 P1 间距收口） */
+        @media (max-width: 768px) {
+            .family-page .file-stats { gap: 8px; margin-bottom: 10px; }
+            .family-page .file-stat { padding: 10px 12px; }
+            .fam-biggrid { gap: 2px; }
+            .fam-bigvalue { font-size: 17px; }
+        }
+
+        /* 触屏硬约束：编辑弹窗「配色」小圆点内联 22px，coarse 下放大到 44px（允许换行） */
+        @media (pointer: coarse) {
+            #colorPicker button { width: 44px !important; height: 44px !important; }
+        }
+    </style>
+
+
+</head>
+<body>
+    <div id="pageContent" class="family-page" style="display:none;">
+        <div class="file-stats">
+            <div class="file-stat"><div class="fs-value" id="mTotal">0</div><div class="fs-label">家庭成员</div></div>
+            <div class="file-stat"><div class="fs-value" id="mBirthday">0</div><div class="fs-label">30 天内生日</div></div>
+            <div class="file-stat"><div class="fs-value" id="mAnn">0</div><div class="fs-label">关联纪念日</div></div>
+            <div class="file-stat"><div class="fs-value" id="mGift">¥0</div><div class="fs-label">礼金往来净额</div></div>
+        </div>
+
+        <!-- 工具条：筛选 tabs -->
+        <div class="fam-toolbar">
+            <span style="font-size:13px;color:var(--text-secondary);">家庭成员</span>
+            <div class="mini-tabs" id="filterTabs">
+                <button type="button" class="active" data-f="all" onclick="setFilter('all')">全部</button>
+                <button type="button" data-f="upcoming" onclick="setFilter('upcoming')">近期生日/纪念日</button>
+            </div>
+        </div>
+
+        <!-- 顶部家人头像横滑切换 -->
+        <div class="fam-rail" id="famRail"></div>
+
+        <!-- 当前成员概览大卡 + 详情分组卡（内联渲染，替代原详情弹窗） -->
+        <div id="famOverviewWrap"></div>
+        <div id="famDetail"></div>
+
+        <!-- 全空态：一个家人都没有 -->
+        <div id="famEmptyAll"></div>
+    </div>
+
+    <!-- 新增 / 编辑家人（极简列表式 + 底部大胶囊完成） -->
+    <div id="memberModal" class="modal-overlay">
+        <div class="modal sheet-modal">
+            <div class="modal-header">
+                <h3 id="memberModalTitle">添加家人</h3>
+                <button class="modal-close" onclick="closeModal('memberModal')" aria-label="关闭">&times;</button>
+            </div>
+            <div class="sheet-list">
+                <div class="sheet-row">
+                    <span class="lbl req">称呼</span>
+                    <span class="val"><input type="text" id="fmName" placeholder="如：妈妈、老婆、大宝" autofocus></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">关系</span>
+                    <span class="val"><select id="fmRelation"></select></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">头像</span>
+                    <span class="val"><div class="chip-list" id="emojiPicker"></div></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">生日</span>
+                    <span class="val"><input type="date" id="fmBirthday"></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">联系电话</span>
+                    <span class="val"><input type="text" id="fmPhone" placeholder="选填"></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">家庭地址</span>
+                    <span class="val"><input type="text" id="fmAddress" placeholder="如：XX小区X栋X单元"></span>
+                </div>
+                <div class="sheet-row">
+                    <span class="lbl">备注</span>
+                    <span class="val"><textarea id="fmRemark" rows="2" placeholder="过敏史、衣服尺码、喜欢的口味"></textarea></span>
+                </div>
+                <p class="sheet-hint">把纪念日、证件效期物品、人情往来都挂在这个人身上，一处维护、处处可见。</p>
+            </div>
+            <div class="sheet-foot">
+                <button class="fab-complete" onclick="saveMember()">完成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 快速添加纪念日 -->
+    <div id="quickAnnModal" class="modal-overlay">
+        <div class="modal" style="width:420px;">
+            <div class="modal-header">
+                <h3>添加纪念日</h3>
+                <button class="modal-close" onclick="closeModal('quickAnnModal')" aria-label="关闭">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>归属家人</label>
+                <input type="text" id="qaMember" readonly style="background:var(--bg-inset);">
+            </div>
+            <div class="form-group">
+                <label>名称 *</label>
+                <input type="text" id="qaTitle" placeholder="如：生日、结婚纪念日">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>日期 *</label>
+                    <input type="date" id="qaDate">
+                </div>
+                <div class="form-group">
+                    <label>重复</label>
+                    <select id="qaRepeat">
+                        <option value="yearly">每年循环</option>
+                        <option value="once">单次</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('quickAnnModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveQuickAnn()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('family', '家庭成员');
+        const RELATIONS = ['本人', '配偶', '父亲', '母亲', '儿子', '女儿', '兄弟', '姐妹', '祖父', '祖母', '外祖父', '外祖母', '岳父', '岳母', '其他'];
+        const EMOJIS = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.5 9.5a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1zm5 0a.5.5 0 1 1 0 1 .5.5 0 0 1 0-1z"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4.97 0 9-4.03 9-9 0-5.5-3-11-6-12-3 1-6 6.5-6 12 0 .34.01.67.03 1"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 5.172C10 3.782 8.423 2.679 6.5 3 4.823 3.253 3 4.96 3 7.5 3 9.845 5 11 7 12v5h6v-5c2-1 4-3.155 4-5.5 0-2.54-1.823-4.247-3.5-4.5C8.577 2.679 10 3.782 10 5.172z"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="10" r="1"/><circle cx="16" cy="14" r="1"/><circle cx="16" cy="18" r="1"/><circle cx="12" cy="4" r="1"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'];
+        const COLORS = ['#4CAF50', '#3b82f6', '#f59e0b', '#ef4444', '#3b82f6', '#3b82f6', '#3b82f6', '#3b82f6'];
+        // AVATARS 已由 common.js 全局定义（12 项卡通头像），此处不再重复声明
+
+        let members = [], filter = 'all', editingId = null, selectedEmoji = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>', selectedColor = '#4CAF50', selectedAvatar = null, detailId = null, detailData = null;
+        let selectedId = null; // 当前头像横滑选中的家人
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function money(n) { return '¥' + (+n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function leftText(d) {
+            if (d === null || d === undefined) return '—';
+            if (d < 0) return '已过 ' + (-d) + ' 天';
+            if (d === 0) return '就是今天';
+            return '还有 ' + d + ' 天';
+        }
+        // 由关系推断性别（仅用于概览大卡展示，不改数据字段）
+        function genderOf(relation) {
+            const male = ['父亲', '儿子', '兄弟', '祖父', '岳父'];
+            const female = ['母亲', '女儿', '姐妹', '祖母', '外祖母', '岳母'];
+            if (male.indexOf(relation) >= 0) return '男';
+            if (female.indexOf(relation) >= 0) return '女';
+            return '';
+        }
+        // 由生日计算周岁
+        function ageOf(birthday) {
+            if (!birthday) return null;
+            const b = new Date(birthday + 'T00:00:00');
+            if (isNaN(b.getTime())) return null;
+            const now = new Date();
+            let age = now.getFullYear() - b.getFullYear();
+            const m = now.getMonth() - b.getMonth();
+            if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+            return age >= 0 ? age : null;
+        }
+
+        function initSelects() {
+            document.getElementById('fmRelation').innerHTML = RELATIONS.map(r => `<option value="${r}">${r}</option>`).join('');
+            document.getElementById('emojiPicker').innerHTML = AVATARS.map((a,i) =>
+                `<button type="button" class="avatar-chip" data-avatar="${i}" onclick="pickAvatar(${i})" title="${a.name}"><img src="${a.src}" alt="${a.name}" loading="lazy"><span class="avatar-chip-name">${a.name}</span></button>`).join('')
+                + '<span style="font-size:12px;color:var(--text-secondary);align-self:center;">点选头像</span>';
+            document.getElementById('emojiPicker').innerHTML += '<div class="chip-list" style="width:100%;margin-top:6px;justify-content:flex-end;" id="colorPicker">'
+                + COLORS.map(c => `<button type="button" onclick="pickColor('${c}')" style="width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;background:${c};" data-color="${c}" aria-label="配色"></button>`).join('')
+                + '</div>';
+        }
+        function pickEmoji(v) {
+            // 兼容索引（数字）与原始 SVG 字符串（存量数据）
+            let idx = -1;
+            if (typeof v === 'number' || /^\d+$/.test(String(v))) {
+                idx = Number(v);
+            } else {
+                idx = EMOJIS.indexOf(v);
+            }
+            if (idx >= 0 && idx < EMOJIS.length) {
+                selectedEmoji = EMOJIS[idx];
+            }
+            document.querySelectorAll('#emojiPicker [data-emoji]').forEach(b => b.classList.toggle('pill', Number(b.dataset.emoji) === idx));
+        }
+        function pickColor(c) {
+            selectedColor = c;
+            document.querySelectorAll('#emojiPicker [data-color]').forEach(b => b.style.borderColor = b.dataset.color === c ? 'var(--text-primary)' : 'transparent');
+        }
+        function pickAvatar(i) {
+            const a = AVATARS[i];
+            if (!a) return;
+            selectedAvatar = a.key;
+            document.querySelectorAll('#emojiPicker [data-avatar]').forEach(b => b.classList.toggle('pill', Number(b.dataset.avatar) === i));
+        }
+
+        async function loadAll() {
+            const r = await apiGet('/api/family');
+            members = (r.code === 200 && r.data) ? r.data : [];
+            renderStats();
+            renderRail();
+            // F3-3：从首页提醒 ?hl=<memberId> 跳入时，直接选中该家人（而非固定选中第一位）
+            const hm = (location.search || '').match(/[?&]hl=(\d+)/);
+            if (hm && members.find(m => m.id === +hm[1])) selectedId = +hm[1];
+            // 自动选中第一位家人（保留原 selectedId 若仍存在）
+            if (members.length) {
+                if (!members.find(m => m.id === selectedId)) selectedId = members[0].id;
+                selectMember(selectedId);
+            } else {
+                selectedId = null;
+                document.getElementById('famOverviewWrap').innerHTML = '';
+                document.getElementById('famDetail').innerHTML = '';
+                renderEmptyAll();
+            }
+        }
+        function renderStats() {
+            document.getElementById('mTotal').textContent = members.length;
+            document.getElementById('mBirthday').textContent = members.filter(m => m.birthdayLeft !== null && m.birthdayLeft <= 30).length;
+            document.getElementById('mAnn').textContent = members.reduce((s, m) => s + (m.annCount || 0), 0);
+            const net = members.reduce((s, m) => s + (m.giftNet || 0), 0);
+            document.getElementById('mGift').textContent = (net >= 0 ? '+' : '-') + money(Math.abs(net)).replace('¥', '¥');
+        }
+        function upcomingOf(m) {
+            const arr = [];
+            if (m.birthdayLeft !== null && m.birthdayLeft !== undefined) arr.push({ label: '生日', left: m.birthdayLeft });
+            if (m.nextAnniversary) arr.push({ label: m.nextAnniversary.title, left: m.nextAnniversary.left });
+            return arr.sort((a, b) => a.left - b.left)[0] || null;
+        }
+
+        /* ---- FIX-1：家人头像 emoji 渲染层替换为 Lucide 蓝色 SVG ---- */
+        const MEMBER_DEFAULT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
+        const MEMBER_ICON_MAP = {
+            '\u{1F469}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F468}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F467}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F466}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>',
+            '\u{1F476}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>',
+            '\u{1F43E}': '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/></svg>'
+        };
+        const MEMBER_USERS_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+        function renderMemberIcon(e) {
+            if (!e) return MEMBER_DEFAULT_ICON;
+            if (e.indexOf('<svg') === 0) return e;
+            const key = e.replace(/\uFE0F/g, '');
+            if (key.indexOf('\u200d') >= 0) return MEMBER_USERS_ICON;
+            return MEMBER_ICON_MAP[key] || MEMBER_DEFAULT_ICON;
+        }
+        // 成员头像渲染：命中卡通头像图则显示 <img>（统一走 common.js memberAvatarHtml），否则回退 emoji SVG
+        function memberAvatarInner(m) {
+            if (window.memberAvatarHtml) {
+                const h = window.memberAvatarHtml(m);
+                if (h) return h;
+            }
+            return renderMemberIcon(m && m.emoji);
+        }
+
+        /* ---- 顶部头像横滑条 ---- */
+        function renderRail() {
+            const box = document.getElementById('famRail');
+            if (!members.length) {
+                box.innerHTML = `<div style="padding:18px 4px;color:var(--text-secondary);font-size:13px;flex:1;">还没有家庭成员</div>`
+                    + railAddBtn();
+                return;
+            }
+            let list = members.slice();
+            if (filter === 'upcoming') list = list.filter(m => { const u = upcomingOf(m); return u && u.left <= 30; });
+            if (!list.length) {
+                box.innerHTML = `<div style="padding:18px 4px;color:var(--text-secondary);font-size:13px;flex:1;">近期没有生日/纪念日</div>`
+                    + railAddBtn();
+                return;
+            }
+            box.innerHTML = list.map(m => {
+                const color = m.color || '#4CAF50';
+                const active = m.id === selectedId ? 'active' : '';
+                return `<button type="button" class="fam-rail-item ${active}" data-id="${m.id}" onclick="selectMember(${m.id})">
+                    <div class="fam-avatar" style="background:${color}22;color:${color};">${memberAvatarInner(m)}</div>
+                    <div class="dot"></div>
+                    <div class="fam-rail-name">${escapeHtml(m.name)}</div>
+                </button>`;
+            }).join('') + railAddBtn();
+        }
+        function railAddBtn() {
+            return `<button type="button" class="fam-rail-item" onclick="openMemberModal()">
+                <div class="fam-rail-add">＋</div>
+                <div class="dot"></div>
+                <div class="fam-rail-name">添加</div>
+            </button>`;
+        }
+        function renderEmptyAll() {
+            document.getElementById('famEmptyAll').innerHTML = members.length ? ''
+                : `<div class="card" style="text-align:center;padding:30px 16px;">
+                    <div style="font-size:36px;margin-bottom:10px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="m8 11 2 2 4-4"/></svg></div>
+                    <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">还没有家庭成员</div>
+                    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">添加家人后，可把纪念日、家庭物品、人情往来都挂到他/她名下</div>
+                    <button class="btn btn-primary" onclick="openMemberModal()">添加第一位家人</button>
+                </div>`;
+        }
+
+        /* ---- 当前成员概览大卡（性别/年龄/身高/体重/BMI） ---- */
+        async function renderOverview() {
+            const wrap = document.getElementById('famOverviewWrap');
+            const m = members.find(x => x.id === selectedId);
+            if (!m) { wrap.innerHTML = ''; return; }
+            const color = m.color || '#4CAF50';
+            const gender = genderOf(m.relation);
+            const age = ageOf(m.birthday);
+            const up = upcomingOf(m);
+            const upPill = up ? `<span class="pill ${up.left <= 7 ? 'warn' : ''}" style="font-size:12px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8"/><path d="M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1"/><path d="M2 21h20"/><path d="M7 8v3"/><path d="M12 8v3"/><path d="M17 8v3"/><path d="M7 4h.01M12 4h.01M17 4h.01"/></svg> ${escapeHtml(up.label)} ${leftText(up.left)}</span>` : '';
+            wrap.innerHTML = `<div class="card fam-overview">
+                <div class="fam-overview-head">
+                    <div class="member-avatar" style="background:${color}22;color:${color};">${memberAvatarInner(m)}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="fam-overview-name">${escapeHtml(m.name)}</div>
+                        <div class="fam-overview-rel">${escapeHtml(m.relation || '未填关系')}${m.phone ? ' · ' + escapeHtml(m.phone) : ''}</div>
+                    </div>
+                    <div class="fam-overview-actions">
+                        <button class="btn btn-secondary btn-xs" onclick="openMemberModal(${m.id})">编辑</button>
+                        <button type="button" class="member-del-link" onclick="removeMember(${m.id})" aria-label="删除${escapeHtml(m.name)}">删除</button>
+                    </div>
+                </div>
+                <div class="fam-pills">
+                    ${upPill}
+                    <span class="pill muted" style="font-size:12px;">纪念日 ${m.annCount || 0}</span>
+                    <span class="pill muted" style="font-size:12px;">物品 ${m.itemCount || 0}</span>
+                    <span class="pill warn" data-exp="${m.id}" style="display:none;font-size:12px;"></span>
+                </div>
+                <div class="fam-biggrid">
+                    <div class="fam-bigcell">
+                        <div class="fam-biglabel">性别</div>
+                        <div class="fam-bigvalue">${gender || '—'}</div>
+                    </div>
+                    <div class="fam-bigcell">
+                        <div class="fam-biglabel">年龄</div>
+                        <div class="fam-bigvalue">${age !== null ? age + '<span class="unit">岁</span>' : '<span class="empty">—</span>'}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        /* ---- 详情分组卡（页内联渲染，复用原 summary 接口数据） ---- */
+        async function renderDetail() {
+            const box = document.getElementById('famDetail');
+            if (!selectedId) { box.innerHTML = ''; return; }
+            let r;
+            try { r = await apiGet('/api/family/' + selectedId + '/summary'); }
+            catch (e) { box.innerHTML = ''; return; }
+            if (!r || r.code !== 200 || !r.data) { box.innerHTML = ''; return; }
+            detailData = r.data;
+            detailId = selectedId;
+            // 临期证件/保单 pill：直接用本次 summary 返回的 expiringCount（不再对全员重复拉取）
+            const expPill = document.querySelector('[data-exp]');
+            if (expPill) {
+                if (r.data.expiringCount > 0) {
+                    expPill.textContent = '⏳ 临期证件/保单 ' + r.data.expiringCount + ' 件';
+                    expPill.style.display = '';
+                } else {
+                    expPill.style.display = 'none';
+                }
+            }
+            const m = r.data.member;
+            const giftIn = r.data.gifts.filter(g => g.direction === 'in').reduce((s, g) => s + (+g.amount || 0), 0);
+            const giftOut = r.data.gifts.filter(g => g.direction === 'out').reduce((s, g) => s + (+g.amount || 0), 0);
+            const blocks = [];
+
+            // 基础信息
+            blocks.push(`<div class="sec-card">
+                <div class="sec-head"><div class="sec-bar"></div><div class="sec-title">基础信息</div></div>
+                <div class="drow"><span class="k">生日</span><span class="v">${m.birthday || '—'}${m.birthdayLeft !== null && m.birthdayLeft !== undefined ? '（' + leftText(m.birthdayLeft) + '）' : ''}</span></div>
+                <div class="drow"><span class="k">电话</span><span class="v">${escapeHtml(m.phone || '—')}</span></div>
+                <div class="drow"><span class="k">地址</span><span class="v">${escapeHtml(m.address || '—')}</span></div>
+                <div class="drow"><span class="k">备注</span><span class="v">${escapeHtml(m.remark || '—')}</span></div>
+                <div class="drow"><span class="k">保险库</span><span class="v">${m.vaultCount || 0} 条证件/卡号</span></div>
+            </div>`);
+
+            // 纪念日
+            blocks.push(`<div class="sec-card">
+                <div class="sec-head"><div class="sec-bar"></div><div class="sec-title">纪念日</div><div class="sec-count">共 ${r.data.anniversaries.length} 个</div></div>
+                ${r.data.anniversaries.length
+                    ? r.data.anniversaries.map(a => `<div class="drow"><span class="k">${escapeHtml(a.title)}</span><span class="v">${a.date}${a.repeat === 'yearly' ? '（每年）' : ''}</span></div>`).join('')
+                    : `<div class="fam-empty"><div class="txt">暂无关联纪念日</div><button class="btn-sm-add" onclick="quickAnnFromDetail()">＋ 添加纪念日</button></div>`}
+            </div>`);
+
+            // 证件效期物品
+            blocks.push(`<div class="sec-card">
+                <div class="sec-head"><div class="sec-bar"></div><div class="sec-title">证件效期</div><div class="sec-count">共 ${r.data.items.length} 件</div></div>
+                ${r.data.items.length
+                    ? r.data.items.slice(0, 8).map(i => `<div class="drow"><span class="k">${escapeHtml(i.name)}</span><span class="v">${i.expiryDate}${i.location ? ' · ' + escapeHtml(i.location) : ''}</span></div>`).join('')
+                    : `<div class="fam-empty"><div class="txt">暂无归属物品</div><button class="btn-sm-add" onclick="location.href='/expiries'">＋ 去归档</button></div>`}
+            </div>`);
+
+            // 人情往来
+            blocks.push(`<div class="sec-card">
+                <div class="sec-head"><div class="sec-bar"></div><div class="sec-title">人情往来</div><div class="sec-count">共 ${r.data.gifts.length} 笔</div></div>
+                <div class="drow"><span class="k">合计</span><span class="v"><span class="amount-income">收 ${money(giftIn)}</span> ／ <span class="amount-expense">支 ${money(giftOut)}</span> ／ 净额 ${money(giftIn - giftOut)}</span></div>
+                ${r.data.gifts.length
+                    ? r.data.gifts.slice(0, 6).map(g => `<div class="drow"><span class="k">${g.date}</span><span class="v">${escapeHtml(g.eventType || '—')} · ${g.direction === 'in' ? '收' : '支'} ${money(g.amount)}${g.remark ? ' · ' + escapeHtml(g.remark) : ''}</span></div>`).join('')
+                    : `<div class="fam-empty"><div class="txt">暂无往来记录</div></div>`}
+            </div>`);
+
+            // 保险库条目
+            if (r.data.vaults && r.data.vaults.length) {
+                blocks.push(`<div class="sec-card">
+                    <div class="sec-head"><div class="sec-bar"></div><div class="sec-title">保险库条目</div></div>
+                    ${r.data.vaults.map(v => `<div class="drow"><span class="k">${escapeHtml(v.title)}</span><span class="v">${escapeHtml(v.kind)}${v.expireDate ? ' · 有效期至 ' + v.expireDate : ''}</span></div>`).join('')}
+                </div>`);
+            }
+
+            box.innerHTML = blocks.join('');
+        }
+
+        // 选中某成员：重渲染头像条 active 态 + 概览大卡 + 详情分组卡
+        async function selectMember(id) {
+            selectedId = id;
+            renderRail();
+            await renderOverview();
+            await renderDetail();
+        }
+        // 兼容旧入口（原详情弹窗按钮已改为内联，保留函数名防止外链报错）
+        function openDetail(id) { selectMember(id); }
+        function setFilter(f) {
+            filter = f;
+            document.querySelectorAll('#filterTabs button').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+            renderRail();
+        }
+
+        /* --- 新增 / 编辑（逻辑不动，仅表单 DOM 重排为极简列表） --- */
+        function openMemberModal(id) {
+            editingId = id || null;
+            document.getElementById('memberModalTitle').textContent = id ? '编辑家人' : '添加家人';
+            const m = id ? members.find(x => x.id === id) : null;
+            document.getElementById('fmName').value = m ? m.name : '';
+            document.getElementById('fmRelation').value = m ? (m.relation || '其他') : '其他';
+            document.getElementById('fmBirthday').value = m ? (m.birthday || '') : '';
+            document.getElementById('fmPhone').value = m ? (m.phone || '') : '';
+            document.getElementById('fmAddress').value = m ? (m.address || '') : '';
+            document.getElementById('fmRemark').value = m ? (m.remark || '') : '';
+            selectedEmoji = m ? (m.emoji || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>') : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>';
+            selectedAvatar = (m && m.avatar && AVATARS.some(a => a.key === m.avatar)) ? m.avatar : null;
+            selectedColor = m ? (m.color || '#4CAF50') : COLORS[members.length % COLORS.length];
+            // 高亮已选头像（与 pickAvatar 一致）
+            document.querySelectorAll('#emojiPicker [data-avatar]').forEach(b => {
+                const ai = AVATARS.findIndex(a => a.key === selectedAvatar);
+                b.classList.toggle('pill', Number(b.dataset.avatar) === ai);
+            });
+            pickEmoji(selectedEmoji); pickColor(selectedColor);
+            openModal('memberModal');
+        }
+        async function saveMember() {
+            const data = {
+                name: document.getElementById('fmName').value.trim(),
+                relation: document.getElementById('fmRelation').value,
+                birthday: document.getElementById('fmBirthday').value,
+                phone: document.getElementById('fmPhone').value.trim(),
+                address: document.getElementById('fmAddress').value.trim(),
+                remark: document.getElementById('fmRemark').value,
+                emoji: selectedEmoji,
+                avatar: selectedAvatar,
+                color: selectedColor
+            };
+            if (!data.name) return showToast('请填写称呼', 'warning');
+            const r = editingId ? await apiPut('/api/family/' + editingId, data) : await apiPost('/api/family', data);
+            if (r.code === 200) { showToast('保存成功'); closeModal('memberModal'); loadAll(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+        async function removeMember(id) {
+            const m = members.find(x => x.id === id);
+            const annN = m ? (m.annCount || 0) : 0;
+            const itemN = m ? (m.itemCount || 0) : 0;
+            if (!(await confirmModal({
+                title: '删除确认',
+                message: '删除「' + (m ? m.name : '') + '」后，其名下 ' + annN + ' 个纪念日、' + itemN + ' 件家庭物品及人情往来记录都不会被删除，只会解除与该家人的关联。确定继续？'
+            }))) return;
+            const r = await apiDelete('/api/family/' + id);
+            if (r.code === 200) {
+                showToast('已删除');
+                if (selectedId === id) selectedId = null;
+                loadAll();
+            }
+            else showToast(r.message || '删除失败', 'error');
+        }
+
+        /* --- 快速添加纪念日（逻辑不动） --- */
+        function quickAnnFromDetail() {
+            const m = detailData && detailData.member;
+            if (!m) return;
+            document.getElementById('qaMember').value = m.name;
+            document.getElementById('qaTitle').value = '';
+            document.getElementById('qaDate').value = m.birthday || todayStr();
+            document.getElementById('qaRepeat').value = 'yearly';
+            openModal('quickAnnModal');
+        }
+        async function saveQuickAnn() {
+            const data = {
+                title: document.getElementById('qaTitle').value.trim(),
+                date: document.getElementById('qaDate').value,
+                repeat: document.getElementById('qaRepeat').value,
+                type: 'count-down',
+                memberId: detailId
+            };
+            if (!data.title || !data.date) return showToast('名称和日期不能为空', 'warning');
+            const r = await apiPost('/api/anniversaries', data);
+            if (r.code === 200) { showToast('已添加到该家人的纪念日'); closeModal('quickAnnModal'); loadAll(); }
+            else showToast(r.message || '保存失败', 'error');
+        }
+
+        initSelects();
+        loadAll();
+    </script>
+</body>
+</html>

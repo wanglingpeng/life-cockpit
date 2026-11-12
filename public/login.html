@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生活驾驶舱 - 登录</title>
+    <script>
+    /* 全局错误兜底（P1-6）：登录页不加载 common.js，这里内联同款逻辑，
+     * 与 public/js/common.js 顶部「全局错误兜底」保持一致，改动请同步两处。 */
+    (function () {
+      var shown = false;
+      function boot(detail) {
+        try {
+          if (!document.body || document.getElementById('g-error-bar')) return;
+          var bar = document.createElement('div');
+          bar.id = 'g-error-bar';
+          bar.setAttribute('role', 'alert');
+          bar.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2147483000;'
+            + 'display:flex;align-items:center;gap:10px;width:calc(100vw - 32px);max-width:560px;box-sizing:border-box;'
+            + 'padding:10px 12px 10px 16px;border-radius:12px;background:#1f2937;color:#f3f4f6;'
+            + 'font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;'
+            + 'box-shadow:0 8px 24px rgba(0,0,0,.28);';
+          var txt = document.createElement('span');
+          txt.textContent = '页面出了点小问题，部分功能可能不可用';
+          txt.style.cssText = 'flex:1 1 auto;min-width:0;';
+          txt.title = detail || '';
+          var refresh = document.createElement('button');
+          refresh.textContent = '刷新页面';
+          refresh.style.cssText = 'flex:none;min-height:34px;padding:0 14px;border:0;border-radius:8px;'
+            + 'background:#2563eb;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;';
+          refresh.onclick = function () { location.reload(); };
+          var close = document.createElement('button');
+          close.textContent = '×';
+          close.setAttribute('aria-label', '关闭提示');
+          close.style.cssText = 'flex:none;min-width:30px;min-height:30px;border:0;border-radius:6px;'
+            + 'background:transparent;color:#9ca3af;font-family:inherit;font-size:16px;line-height:1;cursor:pointer;';
+          close.onclick = function () { bar.remove(); };
+          bar.appendChild(txt); bar.appendChild(refresh); bar.appendChild(close);
+          document.body.appendChild(bar);
+        } catch (e) { /* 兜底自身绝不能再抛错 */ }
+      }
+      function show(detail) {
+        if (shown) return;
+        shown = true;
+        try { console.error('[错误兜底]', detail); } catch (e) {}
+        if (document.body) boot(detail);
+        else document.addEventListener('DOMContentLoaded', function () { boot(detail); }, { once: true });
+      }
+      window.onerror = function (msg, src, line, col) {
+        if (src && /-extension:/.test(src)) return false;
+        show(String(msg) + (src ? '（' + String(src).replace(/^.*[\\/]/, '') + ':' + line + ':' + col + '）' : ''));
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e && e.reason;
+        show('Promise 异常：' + (r && r.message ? r.message : String(r || '未知异常')));
+      });
+    })();
+    </script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <style>
+        /* ===== 登录页独立样式（天空风格） ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #eef4ff 0%, #e7f0ff 48%, #e3f2ff 100%);
+            color: #1c2b45;
+            overflow: hidden;
+        }
+        #bgCanvas { position: fixed; inset: 0; z-index: 0; }
+
+        .login-wrap {
+            position: relative; z-index: 2;
+            height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            gap: clamp(48px, 9vw, 140px);
+            padding: 24px;
+        }
+
+        /* ---- 左侧品牌区 ---- */
+        .login-brand { text-align: center; user-select: none; }
+        .brand-logo-mark {
+            width: 132px; height: 132px; margin: 0 auto 26px;
+            border-radius: 32px;
+            background: linear-gradient(135deg, #4f7cff 0%, #3b82f6 55%, #1d4ed8 100%);
+            box-shadow: 0 18px 46px rgba(59,130,246,.3), 0 0 0 1px rgba(29,78,216,.22), inset 0 2px 6px rgba(255,255,255,.35);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff;
+            transform: rotate(-6deg);
+            animation: logoFloat 5s ease-in-out infinite;
+        }
+        .brand-logo-mark svg { width: 64px; height: 64px; }
+        @keyframes logoFloat { 0%,100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(-6deg) translateY(-10px); } }
+        .brand-name {
+            font-size: 40px; font-weight: 800; letter-spacing: 6px;
+            color: #1e3a8a;
+        }
+        .brand-slogan {
+            margin-top: 14px; font-size: 15px; letter-spacing: 3px;
+            color: #4a5873;
+        }
+
+        /* ---- 右侧登录卡片 ---- */
+        .login-card {
+            width: 380px; max-width: 92vw;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(30, 58, 138, .12), 0 4px 14px rgba(30, 58, 138, .06);
+            padding: 38px 36px 34px;
+        }
+        .lc-title { font-size: 20px; font-weight: 700; color: #16223c; }
+        .lc-sub { font-size: 12px; color: #5f6f8a; margin-top: 6px; margin-bottom: 26px; }
+        .lc-field { position: relative; margin-bottom: 16px; }
+        .lc-field .f-icon {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 16px; height: 16px; color: var(--text-secondary); pointer-events: none;
+        }
+        .lc-field .f-icon svg { width: 15px; height: 15px; }
+        .lc-field input {
+            width: 100%; height: 46px;
+            padding: 0 58px 0 38px;
+            border: 1px solid #e3e9f2; border-radius: 10px;
+            background: #f7f9fd;
+            font-size: 14px; color: #1c2b45;
+            outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
+        }
+        .lc-field input:focus {
+            border-color: #3b82f6; background: #fff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .16);
+        }
+        .lc-field input:focus-visible { outline: none; }
+        .lc-field input::placeholder { color: var(--text-secondary); }
+        .f-eye {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            display: inline-flex; align-items: center; justify-content: center;
+            border: none; background: transparent; cursor: pointer;
+            width: 44px; height: 44px; border-radius: 8px;
+            color: var(--text-secondary); padding: 0;
+            transition: color .15s, background .15s;
+        }
+        .f-eye svg { width: 16px; height: 16px; }
+        .f-eye:hover { color: var(--primary-text); background: rgba(59, 130, 246, .08); }
+        .f-eye:active { background: rgba(59, 130, 246, .16); }
+        .f-eye:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+        .f-eye:disabled { opacity: .5; cursor: not-allowed; }
+        .lc-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin: 4px 0 22px; font-size: 13px;
+        }
+        .lc-remember { display: flex; align-items: center; gap: 6px; color: #5a6a85; cursor: pointer; user-select: none; }
+        .lc-remember input { accent-color: #2563eb; width: 15px; height: 15px; cursor: pointer; }
+        .lc-forgot { color: #1d4ed8; text-decoration: none; }
+        .lc-forgot:hover { text-decoration: underline; }
+        .lc-error {
+            display: none; margin: -8px 0 14px;
+            font-size: 13px; color: var(--danger-text);
+        }
+        .lc-btn {
+            width: 100%; height: 46px;
+            border: none; border-radius: 10px;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 52%, #1e40af 100%);
+            background-size: 200% 100%;
+            color: #fff; font-size: 16px; font-weight: 600; letter-spacing: 8px;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(59,130,246,.32);
+            transition: transform .15s, box-shadow .2s, opacity .2s, background-position .5s;
+        }
+        .lc-btn:hover { transform: translateY(-2px); background-position: 100% 0; box-shadow: 0 14px 28px rgba(37,99,235,.42); }
+        .lc-btn:active { transform: translateY(0); }
+        .lc-btn:disabled { opacity: .65; cursor: not-allowed; transform: none; }
+        .lc-btn:focus-visible { outline: 3px solid rgba(37,99,235,.45); outline-offset: 2px; }
+        .lc-btn.shake { animation: shake .4s; }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+        .lc-register { text-align: center; margin-top: 18px; font-size: 13px; display: none; }
+        .lc-register a { color: #2563eb; text-decoration: none; }
+        .lc-register a:hover { text-decoration: underline; }
+
+        /* ---- 注册弹窗 ---- */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 30;
+            background: rgba(15, 23, 42, .45);
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            width: 360px; max-width: 92vw;
+            background: #fff; border-radius: 16px; padding: 24px;
+            box-shadow: 0 24px 60px rgba(0,0,0,.25);
+        }
+        .modal h3 { font-size: 17px; color: #16223c; margin-bottom: 18px; }
+        .modal .form-group { margin-bottom: 14px; }
+        .modal label { display: block; font-size: 13px; color: #5a6a85; margin-bottom: 6px; }
+        .modal input {
+            width: 100%; height: 42px; padding: 0 12px;
+            border: 1px solid #e3e9f2; border-radius: 10px;
+            background: #f7f9fd; font-size: 14px; outline: none;
+        }
+        .modal input:focus { border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,.14); }
+        .modal input:focus-visible { outline: none; }
+        .modal-footer { display: flex; gap: 10px; margin-top: 18px; }
+        .modal-footer button {
+            flex: 1; height: 40px; border-radius: 10px; font-size: 14px; cursor: pointer; border: none;
+        }
+        .mf-cancel { background: #f0f3f9; color: #5a6a85; transition: background .15s, color .15s, box-shadow .15s; }
+        .mf-cancel:hover { background: #e4e9f2; color: #2b3a52; }
+        .mf-cancel:active { background: #d8dee9; }
+        .mf-cancel:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+        .mf-ok { background: linear-gradient(90deg, #2563eb, #1d4ed8, #1e40af); background-size: 200% 100%; color: #fff; transition: background-position .3s, opacity .15s, box-shadow .15s; }
+        .mf-ok:hover { background-position: 100% 0; box-shadow: 0 6px 16px rgba(37,99,235,.35); }
+        .mf-ok:active { box-shadow: none; }
+        .mf-ok:disabled { opacity: .65; cursor: not-allowed; }
+        .mf-ok:focus-visible { outline: 3px solid rgba(37,99,235,.45); outline-offset: 2px; }
+
+        /* ---- 登录成功过渡层 ---- */
+        #transition {
+            position: fixed; inset: 0; z-index: 20;
+            display: none; align-items: center; justify-content: center;
+            background: linear-gradient(140deg, #eef3fb 0%, #e9f1fa 45%, #e9f2ef 100%);
+            opacity: 0; transition: opacity .45s;
+        }
+        #transition.show { display: flex; opacity: 1; }
+        #typeLine {
+            font-size: clamp(24px, 4vw, 40px); font-weight: 700;
+            color: #2563eb; letter-spacing: 2px;
+        }
+        #typeLine::after { content: '▏'; animation: caret 1s steps(1) infinite; color: #2563eb; }
+        @keyframes caret { 50% { opacity: 0; } }
+
+        @media (max-width: 760px) {
+            .login-wrap { flex-direction: column; gap: 34px; padding-top: 8vh; }
+            .brand-logo-mark { width: 92px; height: 92px; font-size: 44px; border-radius: 24px; }
+            .brand-name { font-size: 30px; }
+            .login-card { padding: 30px 24px; }
+        }
+        /* 无障碍：reduced-motion 全局降级 */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+            #bgCanvas { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bgCanvas"></canvas>
+
+    <div class="login-wrap">
+        <div class="login-brand">
+            <div class="brand-logo-mark"><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2h-4.5v-6h-5v6H5a2 2 0 0 1-2-2z"/></svg></div>
+            <div class="brand-name">生活驾驶舱</div>
+            <div class="brand-slogan">记录全家 · 让生活井井有条</div>
+        </div>
+
+        <div class="login-card">
+            <div class="lc-title">账号登录</div>
+            <div class="lc-sub">家庭统一入口 · 登录后进入工作台</div>
+            <form id="loginForm">
+                <div class="lc-field">
+                    <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                    <input type="text" id="username" placeholder="请输入用户名" required autocomplete="username">
+                </div>
+                <div class="lc-field">
+                    <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                    <input type="password" id="password" placeholder="请输入密码" required autocomplete="current-password">
+                    <button type="button" class="f-eye" id="eyeBtn" aria-label="显示或隐藏密码"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+                </div>
+                <div class="lc-error" id="errorMsg"></div>
+                <div class="lc-row">
+                    <label class="lc-remember"><input type="checkbox" id="remember" checked>记住登录状态</label>
+                    <a href="#" class="lc-forgot" id="forgotLink">忘记密码?</a>
+                </div>
+                <button type="submit" class="lc-btn" id="loginBtn">登 录</button>
+            </form>
+            <div class="lc-register" id="registerLink"><a href="#" onclick="showRegisterModal();return false;">没有账号？立即注册</a></div>
+        </div>
+    </div>
+
+    <!-- 登录成功过渡层 -->
+    <div id="transition"><div id="typeLine"></div></div>
+
+    <!-- 注册弹窗 -->
+    <div id="registerModal" class="modal-overlay">
+        <div class="modal">
+            <h3>注册账号</h3>
+            <form id="registerForm" autocomplete="on">
+                <div class="form-group"><label>用户名</label><input type="text" id="regUsername" placeholder="请输入用户名" autocomplete="username" required></div>
+                <div class="form-group"><label>密码</label><input type="password" id="regPassword" placeholder="请输入密码（至少6位）" autocomplete="new-password" minlength="6" required></div>
+                <div class="lc-error" id="regError"></div>
+                <div class="modal-footer">
+                    <button type="button" class="mf-cancel" onclick="closeRegisterModal()">取消</button>
+                    <button type="submit" class="mf-ok" id="regBtn">注册</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        /* ================= 动态粒子连线背景 ================= */
+        (function () {
+            const canvas = document.getElementById('bgCanvas');
+            const ctx = canvas.getContext('2d');
+            let W, H, pts = [], polys = [];
+            const N = matchMedia('(pointer:coarse)').matches ? 40 : 68, LINK = 150;
+
+            function resize() {
+                W = canvas.width = innerWidth; H = canvas.height = innerHeight;
+            }
+            function init() {
+                resize();
+                pts = Array.from({ length: N }, () => ({
+                    x: Math.random() * W, y: Math.random() * H,
+                    vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35,
+                    r: Math.random() * 1.8 + .8
+                }));
+                polys = Array.from({ length: 4 }, () => ({
+                    cx: Math.random() * W, cy: Math.random() * H,
+                    size: 60 + Math.random() * 90, n: 3 + Math.floor(Math.random() * 2),
+                    a: Math.random() * Math.PI, va: (Math.random() - .5) * .0016
+                }));
+            }
+            function drawPoly(p) {
+                ctx.save();
+                ctx.translate(p.cx, p.cy); ctx.rotate(p.a);
+                ctx.beginPath();
+                for (let i = 0; i < p.n; i++) {
+                    const ang = i / p.n * Math.PI * 2;
+                    const x = Math.cos(ang) * p.size, y = Math.sin(ang) * p.size * .72;
+                    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = 'rgba(59,130,246,0.06)'; ctx.lineWidth = 1; ctx.stroke();
+                ctx.restore();
+            }
+            let rid;
+            function frame() {
+                ctx.clearRect(0, 0, W, H);
+                polys.forEach(p => { p.a += p.va; drawPoly(p); });
+                for (const p of pts) {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < -20) p.x = W + 20; if (p.x > W + 20) p.x = -20;
+                    if (p.y < -20) p.y = H + 20; if (p.y > H + 20) p.y = -20;
+                }
+                for (let i = 0; i < pts.length; i++) {
+                    for (let j = i + 1; j < pts.length; j++) {
+                        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+                        const d = Math.hypot(dx, dy);
+                        if (d < LINK) {
+                            ctx.strokeStyle = 'rgba(90,125,190,' + (0.16 * (1 - d / LINK)).toFixed(3) + ')';
+                            ctx.lineWidth = 1;
+                            ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+                        }
+                    }
+                }
+                for (const p of pts) {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(80,110,175,0.35)'; ctx.fill();
+                }
+                rid = requestAnimationFrame(frame);
+            }
+            addEventListener('resize', resize);
+            if (matchMedia('(prefers-reduced-motion:reduce)').matches) { init(); frame(); return; }
+            document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(rid); else rid = requestAnimationFrame(frame); });
+            init(); rid = requestAnimationFrame(frame);
+        })();
+
+        /* ================= 密码可见切换 ================= */
+        document.getElementById('eyeBtn').addEventListener('click', function () {
+            const pwd = document.getElementById('password');
+            pwd.type = pwd.type === 'password' ? 'text' : 'password';
+        });
+
+        /* ================= 记住用户名 ================= */
+        (function () {
+            const saved = localStorage.getItem('rememberUser');
+            if (saved) document.getElementById('username').value = saved;
+        })();
+
+        /* ================= 忘记密码 ================= */
+        document.getElementById('forgotLink').addEventListener('click', function (e) {
+            e.preventDefault();
+            showErr('请联系管理员在「通用配置 → 用户管理」中重置密码');
+        });
+
+        /* ================= 登录 ================= */
+        function showErr(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg; el.style.display = 'block';
+            const btn = document.getElementById('loginBtn');
+            btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+        }
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            if (!username || !password) return showErr('请输入用户名和密码');
+            btn.disabled = true; btn.textContent = '登录中...';
+            document.getElementById('errorMsg').style.display = 'none';
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await resp.json();
+                if (result.code === 200) {
+                    // 安全加固：不再把明文 token 写进 localStorage（可被 XSS/插件读取），鉴权改用服务端 HttpOnly cookie
+                    localStorage.removeItem('token');
+                    localStorage.setItem('username', result.data.username);
+                    localStorage.setItem('userId', result.data.userId);
+                    localStorage.setItem('role', result.data.role || 'user');
+                    localStorage.setItem('themeColor', result.data.themeColor || 'blue');
+                    // token cookie 由服务端 Set-Cookie 下发（HttpOnly），前端不再写入，避免覆盖掉 HttpOnly 标记
+                    if (document.getElementById('remember').checked) {
+                        localStorage.setItem('rememberUser', result.data.username);
+                    } else {
+                        localStorage.removeItem('rememberUser');
+                    }
+                    playTransition(result.data.username);
+                } else {
+                    showErr(result.message || '登录失败');
+                }
+            } catch (err) {
+                showErr('网络错误，请稍后重试');
+            } finally {
+                btn.disabled = false; btn.textContent = '登 录';
+            }
+        });
+
+        /* ================= 打字机欢迎过渡 ================= */
+        const HELLO_LINES = [
+            u => '欢迎回来，' + u + '，今天也要好好生活呀',
+            u => u + '，家里的事都交给我',
+            '节日上班不易，先把今天稳稳过完',
+            '把日子过成自己喜欢的样子',
+            '生活嘛，最重要的就是井井有条'
+        ];
+        function playTransition(username) {
+            const pick = HELLO_LINES[Math.floor(Math.random() * HELLO_LINES.length)];
+            const line = typeof pick === 'function' ? pick(username) : pick;
+            const wrap = document.getElementById('transition');
+            const el = document.getElementById('typeLine');
+            wrap.classList.add('show');
+            let i = 0;
+            const timer = setInterval(() => {
+                el.textContent = line.slice(0, ++i);
+                if (i >= line.length) {
+                    clearInterval(timer);
+                    setTimeout(() => { window.location.href = '/dashboard'; }, 900);
+                }
+            }, 90);
+        }
+
+        /* ================= 注册 ================= */
+        (async function () {
+            try {
+                const resp = await fetch('/api/auth/config');
+                const data = await resp.json();
+                if (data.code === 200 && data.data && data.data.allowRegistration) {
+                    document.getElementById('registerLink').style.display = 'block';
+                }
+            } catch (e) { }
+        })();
+        function showRegisterModal() {
+            document.getElementById('regError').style.display = 'none';
+            document.getElementById('registerModal').classList.add('open');
+        }
+        function closeRegisterModal() {
+            document.getElementById('registerModal').classList.remove('open');
+        }
+        document.getElementById('registerForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            doRegister();
+        });
+        async function doRegister() {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const err = document.getElementById('regError');
+            const btn = document.getElementById('regBtn');
+            if (!username || !password) { err.textContent = '请填写用户名和密码'; err.style.display = 'block'; return; }
+            if (password.length < 6) { err.textContent = '密码至少6位'; err.style.display = 'block'; return; }
+            btn.disabled = true; btn.textContent = '注册中...';
+            try {
+                const resp = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await resp.json();
+                if (result.code === 200) {
+                    // 安全加固：不再把明文 token 写进 localStorage（可被 XSS/插件读取），鉴权改用服务端 HttpOnly cookie
+                    localStorage.removeItem('token');
+                    localStorage.setItem('username', result.data.username);
+                    localStorage.setItem('userId', result.data.userId);
+                    localStorage.setItem('role', result.data.role || 'user');
+                    localStorage.setItem('themeColor', result.data.themeColor || 'blue');
+                    // token cookie 由服务端 Set-Cookie 下发（HttpOnly），前端不再写入，避免覆盖掉 HttpOnly 标记
+                    playTransition(result.data.username);
+                } else {
+                    err.textContent = result.message || '注册失败';
+                    err.style.display = 'block';
+                }
+            } catch (e) {
+                err.textContent = '网络错误，请稍后重试';
+                err.style.display = 'block';
+            } finally {
+                btn.disabled = false; btn.textContent = '注册';
+            }
+        }
+    </script>
+</body>
+</html>

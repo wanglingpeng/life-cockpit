@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家底总览 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* 触屏下卡片头部「N 份」导航链接触控尺寸 */
+        @media (pointer: coarse) { #policyCount { min-height: 44px; } }
+    </style>
+
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <!-- 净资产仪表盘 -->
+        <div class="card" style="margin-bottom:16px;background:var(--grad-brand);background-size:200% 100%;color:#fff;border:none;box-shadow:0 8px 22px rgba(61,107,255,.28);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <span style="font-weight:600;font-size:15px;opacity:.9;">家庭净资产</span>
+                <span id="healthTag" class="status-tag" style="background:rgba(255,255,255,.22);color:#fff;"></span>
+            </div>
+            <div style="font-size:30px;font-weight:700;" id="netValue">--</div>
+            <div style="display:flex;gap:12px;margin-top:18px;font-size:13px;">
+                <div style="flex:1;background:rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;">
+                    <div style="opacity:.85;">资产</div>
+                    <div style="font-size:16px;font-weight:600;" id="assetValue">--</div>
+                </div>
+                <div style="flex:1;background:rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;">
+                    <div style="opacity:.85;">负债</div>
+                    <div style="font-size:16px;font-weight:600;" id="loanValue">--</div>
+                </div>
+            </div>
+            <!-- 口径说明（评审 P0-1）：资产/负债的口径不止手工录入那一栏，
+                 还要含家庭账本的账户余额。不写清楚，用户只会在本页看到
+                 「资产 ¥15,100」却在资产清单只数到 ¥100，误以为算错了。 -->
+            <div id="nwFormula" style="margin-top:10px;font-size:12px;line-height:1.6;opacity:.86;"></div>
+        </div>
+
+        <!-- 净资产趋势（快照） -->
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title">净资产趋势</span>
+                <span style="font-size:12px;color:var(--text-secondary);" id="nwTrendSub"></span>
+            </div>
+            <div id="nwTrendWrap"></div>
+        </div>
+
+        <!-- 资产分布 + 资产清单 -->
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title">资产构成</span>
+                <span class="status-tag" style="background:var(--primary-light);color:var(--primary);" id="assetCount">0 项</span>
+            </div>
+            <div id="assetDist"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title">资产清单</span>
+                <button class="btn btn-primary btn-xs" onclick="openAssetModal()">+ 新增资产</button>
+            </div>
+            <div id="assetList"></div>
+            <div id="ledgerAssetNote" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text-secondary);"></div>
+        </div>
+
+        <!-- 负债 -->
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">
+                <span class="card-title">负债</span>
+                <span class="status-tag" style="background:var(--danger-light, #ffe0e0);color:var(--danger);" id="loanCount">0 笔</span>
+            </div>
+            <div style="font-weight:600;font-size:13px;margin:2px 0 8px;color:var(--text-secondary);">贷款</div>
+            <div id="loanList"></div>
+            <div style="margin-top:12px;font-size:12px;color:var(--text-secondary);">贷款明细见 <a href="/mortgage" style="color:var(--primary);text-decoration:underline;">贷款计算</a>，此处按贷款本金计入负债。</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
+                <div style="font-weight:600;font-size:13px;color:var(--text-secondary);">其他负债（信用卡分期 / 亲友借款等）</div>
+                <button class="btn btn-secondary btn-xs" onclick="openDebtModal()">+ 新增</button>
+            </div>
+            <div id="otherDebtList"></div>
+            <div id="ledgerDebtNote" style="margin-top:10px;font-size:12px;line-height:1.6;color:var(--text-secondary);"></div>
+        </div>
+
+        <!-- 保险保障 -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">保险保障</span>
+                <a href="/vault" class="status-tag" style="background:var(--primary-light);color:var(--primary);text-decoration:none;" id="policyCount">0 份</a>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.9;" id="policyHint">
+                保单不计入净资产，作为家庭保障覆盖。在「保险库」维护保单后可在此看到份数。
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增资产 -->
+    <div id="assetModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="assetModalTitle">新增资产</h3>
+                <button class="modal-close" onclick="closeModal('assetModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>资产名称 *</label>
+                <input type="text" id="aName" placeholder="如：XX银行存款 / 基金账户">
+            </div>
+            <div class="form-group">
+                <label>类型</label>
+                <select id="aType">
+                    <option value="deposit">存款</option>
+                    <option value="fund">理财</option>
+                    <option value="stock">股票/证券</option>
+                    <option value="gold">贵金属/黄金</option>
+                    <option value="cash">现金</option>
+                    <option value="house">房产</option>
+                    <option value="vehicle">车辆</option>
+                    <option value="invest">投资</option>
+                    <option value="receivable">应收</option>
+                    <option value="other">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>金额（元，整数）*</label>
+                <input type="number" id="aAmount" min="1" step="1" placeholder="整数元，如 120000">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="aNote" placeholder="选填">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('assetModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveAsset()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑其他负债 -->
+    <div id="debtModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="debtModalTitle">新增负债</h3>
+                <button class="modal-close" onclick="closeModal('debtModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>负债名称 *</label>
+                <input type="text" id="dName" placeholder="如：信用卡分期 / 向亲友借款">
+            </div>
+            <div class="form-group">
+                <label>金额（元，整数）*</label>
+                <input type="number" id="dAmount" min="1" step="1" placeholder="整数元，如 5000">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="dNote" placeholder="选填">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('debtModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveDebt()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('networth', '家底总览');
+        let nw = null;
+        let editingAssetId = null;
+
+        const TYPE_CN = { deposit: '存款', fund: '理财', stock: '股票/证券', gold: '贵金属/黄金', cash: '现金', house: '房产', vehicle: '车辆', invest: '投资', receivable: '应收', other: '其他' };
+        const TYPE_ICON = { deposit: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>', fund: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>', stock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>', gold: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.21 15 11 17.24"/><path d="M17.13 4.87 16 2.5 13.5 4.5 12 2l-1.5 2.5L8 2.5 6.87 4.87"/><circle cx="12" cy="15" r="6"/><circle cx="12" cy="15" r="2"/></svg>', cash: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', house: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>', vehicle: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>', invest: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>', receivable: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>', other: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>' };
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        async function load() {
+            const r = await apiGet('/api/networth');
+            if (r.code !== 200) return;
+            nw = r.data;
+            renderTrend();
+            // 净资产
+            document.getElementById('netValue').textContent = fmtMoney(nw.net);
+            document.getElementById('assetValue').textContent = fmtMoney(nw.assetTotal);
+            // 负债口径=贷款本金+其他负债合计，与净资产（资产−房贷−其他负债）同屏自洽
+            document.getElementById('loanValue').textContent = fmtMoney((nw.loanTotal || 0) + (nw.otherDebtTotal || 0));
+            /* 口径说明：把「净资产 = 资产 − 负债」拆开写清楚，并明确账本账户的归属。
+               净资产全站唯一权威口径见 server.js computeNetWorth()。 */
+            document.getElementById('nwFormula').innerHTML =
+                '资产 = 手工录入 ' + fmtMoney(nw.manualAssets || 0) + ' + 账本账户正余额 ' + fmtMoney(nw.ledgerAssets || 0) + '<br>'
+                + '负债 = 房贷 ' + fmtMoney(nw.mortgageDebt || 0) + ' + 其他负债 ' + fmtMoney(nw.otherDebtsManual || 0)
+                + (nw.ledgerDebts ? ' + 账本账户欠款 ' + fmtMoney(nw.ledgerDebts) : '');
+            const laNote = document.getElementById('ledgerAssetNote');
+            if (laNote) {
+                laNote.innerHTML = (nw.ledgerAssets
+                    ? '另有账本账户（' + (nw.accountCount || 0) + ' 个）正余额 ' + fmtMoney(nw.ledgerAssets) + '，已计入上方「资产」，明细见 '
+                    : '账本账户无正余额，明细见 ')
+                    + '<a href="/ledger" style="color:var(--primary);text-decoration:underline;">家庭账本</a>。';
+            }
+            const ldNote = document.getElementById('ledgerDebtNote');
+            if (ldNote) {
+                ldNote.innerHTML = nw.ledgerDebts
+                    ? '账本账户欠款 ' + fmtMoney(nw.ledgerDebts) + '（信用卡/钱包负余额）已计入上方「负债」，明细见 <a href="/ledger" style="color:var(--primary);text-decoration:underline;">家庭账本</a>。'
+                    : '';
+            }
+            const health = document.getElementById('healthTag');
+            health.textContent = nw.health;
+            health.style.background = nw.net >= 0 ? 'rgba(255,255,255,.22)' : 'rgba(255,60,60,.85)';
+            // 资产构成
+            renderDist();
+            renderAssets();
+            renderLoans();
+            renderOtherDebts();
+            document.getElementById('policyCount').textContent = nw.policyCount + ' 份';
+        }
+
+        /* 净资产趋势：快照折线（纯 SVG，无依赖） */
+        async function renderTrend() {
+            const wrap = document.getElementById('nwTrendWrap');
+            const sub = document.getElementById('nwTrendSub');
+            const r = await apiGet('/api/networth/snapshots');
+            const snaps = (r.code === 200 && r.data) || [];
+            if (snaps.length < 2) {
+                if (sub) sub.textContent = '';
+                wrap.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:6px 2px;">已开始按日记录快照' + (snaps.length ? '（' + snaps[0].date + ' 起）' : '') + '，积累几天后这里会显示净资产走势。</div>';
+                return;
+            }
+            const vals = snaps.map(s => s.netWorth);
+            const min = Math.min(...vals), max = Math.max(...vals);
+            const span = (max - min) || Math.abs(max) || 1;
+            const W = 600, H = 150, PAD = 8;
+            const pts = snaps.map((s, i) => {
+                const x = PAD + i * (W - PAD * 2) / (snaps.length - 1);
+                const y = PAD + (1 - (s.netWorth - min) / span) * (H - PAD * 2);
+                return x.toFixed(1) + ',' + y.toFixed(1);
+            });
+            const up = vals[vals.length - 1] >= vals[0];
+            /* 好坏语义走全站 CSS 变量（涨=改善 与月报净资产同源 --amount-in，跌=恶化 --danger），适配暗色与换肤 */
+            const col = up ? 'var(--amount-in)' : 'var(--danger)';
+            const gid = 'nwg' + Date.now();
+            wrap.innerHTML =
+                '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:150px;display:block;" role="img" aria-label="净资产走势折线图">'
+                + '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:' + col + ';stop-opacity:.25"/><stop offset="1" style="stop-color:' + col + ';stop-opacity:0"/></linearGradient></defs>'
+                + '<polygon points="' + PAD + ',' + (H - PAD) + ' ' + pts.join(' ') + ' ' + (W - PAD) + ',' + (H - PAD) + '" fill="url(#' + gid + ')" />'
+                + '<polyline points="' + pts.join(' ') + '" style="fill:none;stroke:' + col + ';stroke-width:2" />'
+                + '</svg>'
+                + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-secondary);margin-top:4px;">'
+                + '<span>' + snaps[0].date + '</span><span>最低 ' + fmtMoney(min) + ' · 最高 ' + fmtMoney(max) + '</span><span>' + snaps[snaps.length - 1].date + '</span></div>';
+            if (sub) sub.textContent = snaps.length + ' 天记录';
+        }
+
+        function renderDist() {
+            const box = document.getElementById('assetDist');
+            const total = nw.assetTotal || 1;
+            if (!nw.byType || !nw.byType.length) {
+                box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:6px 2px;">尚未录入资产，在下方「资产清单」新增第一笔后，这里会展示各类资产占比。</div>';
+                return;
+            }
+            box.innerHTML = nw.byType.map(t => {
+                const pct = (t.amount / total * 100).toFixed(1);
+                return `<div style="margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;">
+                        <span>${TYPE_ICON[t.type] || '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>'} ${t.label}</span>
+                        <b>${fmtMoney(t.amount)}<span style="color:var(--text-secondary);font-weight:400;"> · ${pct}%</span></b>
+                    </div>
+                    <div style="height:6px;background:var(--primary-light);border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:var(--grad-bar);"></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderAssets() {
+            const box = document.getElementById('assetList');
+            document.getElementById('assetCount').textContent = nw.assetCount + ' 项';
+            if (!nw.assets.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({
+                    size: 'block',
+                    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>',
+                    title: '还没有资产', text: '录入存款、理财、现金，实时看到净资产',
+                    action: { text: '新增第一笔资产', onClick: function () { openAssetModal(); } }
+                }));
+                return;
+            }
+            box.innerHTML = nw.assets.map(a => `
+                <div class="expiry-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color);">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;">${TYPE_ICON[a.type]} ${escapeHtml(a.name)}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${TYPE_CN[a.type] || a.type}${a.note ? ' · ' + escapeHtml(a.note) : ''}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <b style="font-size:14px;">${fmtMoney(a.amount)}</b>
+                        <button class="btn btn-secondary btn-xs" onclick="editAsset(${a.id})">改</button>
+                        <button class="btn btn-danger btn-xs" onclick="delAsset(${a.id})">删</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderLoans() {
+            const box = document.getElementById('loanList');
+            document.getElementById('loanCount').textContent = nw.loanCount + ' 笔';
+            if (!nw.loans.length) {
+                box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">暂无贷款，无负债。</div>';
+                return;
+            }
+            box.innerHTML = nw.loans.map(m => `
+                <div class="expiry-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color);">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;">${escapeHtml(m.name)}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${m.annualRate}% · ${m.years}年</div>
+                    </div>
+                    <b style="font-size:14px;color:var(--danger);">${fmtMoney(m.principal * 10000)}</b>
+                </div>`).join('');
+        }
+
+        function renderOtherDebts() {
+            const box = document.getElementById('otherDebtList');
+            if (!nw.debts || !nw.debts.length) {
+                box.innerHTML = '<div style="font-size:13px;color:var(--text-secondary);padding:4px 0;">暂无其他负债。</div>';
+                return;
+            }
+            box.innerHTML = nw.debts.map(d => `
+                <div class="expiry-row" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-color);">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;">${escapeHtml(d.name)}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">${escapeHtml(d.note || '')}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <b style="font-size:14px;color:var(--danger);">${fmtMoney(d.amount)}</b>
+                        <button class="btn btn-secondary btn-xs" onclick="editDebt(${d.id})">改</button>
+                        <button class="btn btn-danger btn-xs" onclick="delDebt(${d.id})">删</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function openAssetModal() {
+            editingAssetId = null;
+            document.getElementById('assetModalTitle').textContent = '新增资产';
+            document.getElementById('aName').value = '';
+            document.getElementById('aType').value = 'deposit';
+            document.getElementById('aAmount').value = '';
+            document.getElementById('aNote').value = '';
+            openModal('assetModal');
+        }
+        function editAsset(id) {
+            const a = nw && nw.assets.find(x => x.id === id);
+            if (!a) return;
+            editingAssetId = id;
+            document.getElementById('assetModalTitle').textContent = '编辑资产';
+            document.getElementById('aName').value = a.name || '';
+            document.getElementById('aType').value = a.type || 'other';
+            document.getElementById('aAmount').value = a.amount != null ? (+a.amount) : '';
+            document.getElementById('aNote').value = a.note || '';
+            openModal('assetModal');
+        }
+        function closeAssetModal() { closeModal('assetModal'); }
+
+        async function saveAsset() {
+            const name = document.getElementById('aName').value.trim();
+            const amount = document.getElementById('aAmount').value;
+            if (!name || amount === '') { alert('请填写资产名称和金额'); return; }
+            if (!Number.isInteger(+amount) || !(+amount > 0)) { alert('金额必须为大于 0 的整数元'); return; }
+            const payload = {
+                name, type: document.getElementById('aType').value,
+                amount, note: document.getElementById('aNote').value.trim()
+            };
+            // 新增 POST /api/assets；编辑 PUT /api/assets/:id（后端补齐）
+            const r = editingAssetId
+                ? await apiPut('/api/assets/' + editingAssetId, payload)
+                : await apiPost('/api/assets', payload);
+            if (r.code !== 200) { showToast(r.message || '保存失败', 'error'); return; }
+            closeModal('assetModal');
+            editingAssetId = null;
+            showToast('已保存资产');
+            load();
+        }
+
+        async function delAsset(id) {
+            if (!(await confirmDel('确定删除该资产？'))) return;
+            const r = await apiDelete('/api/assets/' + id);
+            if (r.code !== 200) { showToast(r.message || '删除失败', 'error'); return; }
+            showToast('已删除资产');
+            load();
+        }
+
+        /* ---------- 其他负债维护（/api/debts） ---------- */
+        let editingDebtId = null;
+        function openDebtModal() {
+            editingDebtId = null;
+            document.getElementById('debtModalTitle').textContent = '新增负债';
+            document.getElementById('dName').value = '';
+            document.getElementById('dAmount').value = '';
+            document.getElementById('dNote').value = '';
+            openModal('debtModal');
+        }
+        function editDebt(id) {
+            const d = nw && (nw.debts || []).find(x => x.id === id);
+            if (!d) return;
+            editingDebtId = id;
+            document.getElementById('debtModalTitle').textContent = '编辑负债';
+            document.getElementById('dName').value = d.name || '';
+            document.getElementById('dAmount').value = d.amount != null ? (+d.amount) : '';
+            document.getElementById('dNote').value = d.note || '';
+            openModal('debtModal');
+        }
+        async function saveDebt() {
+            const name = document.getElementById('dName').value.trim();
+            const amount = document.getElementById('dAmount').value;
+            if (!name || amount === '') { alert('请填写负债名称和金额'); return; }
+            if (!Number.isInteger(+amount) || !(+amount > 0)) { alert('金额必须为大于 0 的整数元'); return; }
+            const payload = { name, amount, note: document.getElementById('dNote').value.trim() };
+            const r = editingDebtId
+                ? await apiPut('/api/debts/' + editingDebtId, payload)
+                : await apiPost('/api/debts', payload);
+            if (r.code !== 200) { showToast(r.message || '保存失败', 'error'); return; }
+            closeModal('debtModal');
+            editingDebtId = null;
+            showToast('已保存负债');
+            load();
+        }
+        async function delDebt(id) {
+            if (!(await confirmDel('确定删除该负债？删除后净资产将相应变化。'))) return;
+            const r = await apiDelete('/api/debts/' + id);
+            if (r.code !== 200) { showToast(r.message || '删除失败', 'error'); return; }
+            showToast('已删除负债');
+            load();
+        }
+
+        load();
+    </script>
+</body>
+</html>

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>备忘手记 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        .note-item-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+        .note-pin-btn { flex-shrink: 0; border: none; background: transparent; cursor: pointer; font-size: 16px; padding: 2px; line-height: 1; }
+        .note-item.pinned { background: var(--primary-light, rgba(76,175,80,.08)); }
+        /* 标签体系：列表 chips + 编辑器输入 */
+        .note-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+        .note-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(59,130,246,.1); color: #1d4ed8; cursor: pointer; border: none; line-height: 1.4; }
+        .note-tag:hover { background: rgba(59,130,246,.18); }
+        [data-theme="dark"] .note-tag { background: rgba(59,130,246,.2); color: #7cacf8; }
+        #noteTagsInput { width: 100%; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--input-bg); color: var(--text-primary); font-size: 13px; outline: none; }
+        #noteTagsInput:focus { border-color: #3b82f6; }
+        /* FIX-18：移动端「列表/编辑」单视图切换。桌面端两栏始终并排，返回键隐藏。 */
+        .notes-back-btn { display: none; border: none; background: transparent; color: var(--primary); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
+        /* 移动端首屏压缩（仅 ≤768px 生效）：上移编辑器格式工具两行，避免被底部 Tab 栏遮挡。
+           全部选择器以 .notes-flex 为前缀（该容器类仅本页使用），只压缩 margin/padding/gap，不改控件尺寸。 */
+        @media (max-width: 768px) {
+            .notes-flex { gap: 10px; }
+            .notes-flex .notes-list-pane { padding: 8px; }
+            .notes-flex .note-item { padding: 6px; margin-bottom: 4px; }
+            .notes-flex .note-item h4 { margin-bottom: 2px; }
+            .notes-flex .note-item .note-time { margin-top: 2px; }
+            #notesPagination { margin-top: 4px; padding-top: 2px; }
+            .notes-flex .card { padding: 10px 14px; }
+            .notes-flex .card-header { margin-bottom: 6px; }
+            .notes-flex .rt-toolbar { padding-top: 2px; padding-bottom: 2px; }
+            /* 默认只显列表：隐藏右侧富文本编辑器卡片 */
+            .notes-flex > .card { display: none; }
+            /* 进入编辑态：隐藏列表与筛选，编辑器卡片铺满 */
+            .notes-flex.editing > .notes-list-pane { display: none; }
+            .notes-flex.editing > .card { display: block; }
+            .notes-back-btn { display: inline-flex; }
+            /* 富文本工具栏折叠为横向单行滚动，不再换行成 3 行 */
+            .notes-flex .rt-toolbar { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .notes-flex .rt-toolbar .rt-btn { flex-shrink: 0; }
+            /* 编辑态内容区自适应高度，保存钮拇指可达 */
+            .notes-flex.editing .rt-content { max-height: none; }
+            /* 编辑态隐藏右下角 FAB，避免遮挡保存/删除钮 */
+            body.notes-editing .mobile-fab { display: none !important; }
+        }
+    </style>
+
+
+<style>
+/* === v54·B3 收敛：公共交互增强已并入 theme/，此处仅保留本页专属规则 === */
+/* FIX：深色模式下编辑器内容区对比度增强（页面级覆盖，不改公共文件） */
+[data-theme="dark"] .note-editor,
+[data-theme="dark"] .note-editor textarea { background: #243049; }
+/* FIX：深色模式正文占位符提亮一档（浅色不受影响） */
+[data-theme="dark"] .rt-content[data-empty="1"]::before,
+[data-theme="dark"] .rt-content:empty::before,
+[data-theme="dark"] .rt-content.is-empty::before { color: #94a3b8; }
+</style>
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <div class="notes-flex">
+            <!-- 左侧列表 -->
+            <div class="notes-list-pane">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <span style="font-weight:600;font-size:15px;">笔记列表</span>
+                    <button class="btn btn-primary btn-sm" onclick="createNewNote()">+ 新建笔记</button>
+                </div>
+                <div class="form-inline" style="margin-bottom:4px;align-items:center;gap:6px;">
+                    <!-- UI-51：两个日期框加「从/至」前缀，消除「哪个是开始」的歧义 -->
+                    <span style="font-size:12px;color:var(--text-secondary);flex:0 0 auto;">从</span>
+                    <input type="date" id="filterStartDate" style="flex:1;min-width:0;" title="开始日期" aria-label="开始日期">
+                    <span style="font-size:12px;color:var(--text-secondary);flex:0 0 auto;">至</span>
+                    <input type="date" id="filterEndDate" style="flex:1;min-width:0;" title="结束日期" aria-label="结束日期">
+                </div>
+                <div class="form-inline" style="margin-bottom:4px;">
+                    <input type="text" id="filterKeyword" placeholder="搜索标题或内容..." style="flex:1;min-width:0;" aria-label="搜索备忘标题或内容" onkeydown="if(event.key==='Enter')searchNotes()">
+                    <select id="filterTag" onchange="searchNotes()" style="width:auto;max-width:120px;" aria-label="按标签筛选">
+                        <option value="">全部标签</option>
+                    </select>
+                    <button class="btn btn-secondary btn-xs" onclick="searchNotes()">搜索</button>
+                    <button class="btn btn-secondary btn-xs" onclick="resetFilters()">重置</button>
+                </div>
+                <div id="notesList"></div>
+                <div id="notesPagination" class="pagination"></div>
+            </div>
+
+            <!-- 右侧富文本编辑器 -->
+            <div class="card" style="margin-bottom:0;">
+                <div class="card-header">
+                    <span style="display:flex;align-items:center;gap:6px;">
+                        <button type="button" class="notes-back-btn" onclick="exitNoteEdit()" aria-label="返回笔记列表">‹</button>
+                        <span class="card-title" id="editorTitle">笔记编辑</span>
+                    </span>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-danger btn-sm" id="btnDelete" onclick="deleteCurrentNote()" style="display:none;">删除</button>
+                        <button class="btn btn-primary btn-sm" onclick="saveCurrentNote()">保存</button>
+                    </div>
+                </div>
+                <input type="text" id="noteTitleInput" placeholder="笔记标题..." aria-label="笔记标题"
+                    style="width:100%;padding:11px 14px;border:1px solid var(--border-color);border-radius:var(--radius);background:var(--input-bg);color:var(--text-primary);font-size:15px;font-weight:600;outline:none;margin-bottom:4px;">
+
+                <div class="note-editor">
+                    <div class="rt-toolbar" id="rtToolbar">
+                        <button type="button" class="rt-btn" data-cmd="undo" title="撤销 (Ctrl+Z)" aria-label="撤销"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5 5.5 5.5 0 0 1 14.5 20H11"/></svg></button>
+                        <button type="button" class="rt-btn" data-cmd="redo" title="重做 (Ctrl+Y)" aria-label="重做"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5 5.5 5.5 0 0 0 9.5 20H13"/></svg></button>
+                        <span class="rt-sep"></span>
+                        <button type="button" class="rt-btn" data-cmd="bold" title="加粗 (Ctrl+B)"><b>B</b></button>
+                        <button type="button" class="rt-btn" data-cmd="italic" title="斜体 (Ctrl+I)"><i>I</i></button>
+                        <button type="button" class="rt-btn" data-cmd="underline" title="下划线 (Ctrl+U)"><u>U</u></button>
+                        <button type="button" class="rt-btn" data-cmd="strikeThrough" title="删除线"><s>S</s></button>
+                        <span class="rt-sep"></span>
+                        <button type="button" class="rt-btn" data-block="h2" title="大标题">H1</button>
+                        <button type="button" class="rt-btn" data-block="h3" title="小标题">H2</button>
+                        <button type="button" class="rt-btn" data-block="h4" title="三级标题">H3</button>
+                        <button type="button" class="rt-btn" data-block="p" title="正文">正文</button>
+                        <span class="rt-sep"></span>
+                        <button type="button" class="rt-btn" data-cmd="insertUnorderedList" title="无序列表">• 列表</button>
+                        <button type="button" class="rt-btn" data-cmd="insertOrderedList" title="有序列表">1. 列表</button>
+                        <button type="button" class="rt-btn" data-block="blockquote" title="引用" aria-label="引用"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></svg></button>
+                        <button type="button" class="rt-btn" data-cmd="insertHorizontalRule" title="分割线" aria-label="分割线">—</button>
+                        <span class="rt-sep"></span>
+                        <button type="button" class="rt-btn" data-cmd="createLink" title="插入链接" aria-label="插入链接"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+                        <button type="button" class="rt-btn" data-cmd="unlink" title="移除链接" aria-label="移除链接"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></button>
+                        <button type="button" class="rt-btn" data-cmd="removeFormat" title="清除格式">清除格式</button>
+                        <span class="rt-sep"></span>
+                        <script data-voice-mic data-target="rtContent" data-mode="append"></script>
+                    </div>
+                    <div class="rt-content" id="rtContent" contenteditable="true" spellcheck="false"
+                        data-placeholder="记录点什么…支持加粗、标题、列表、引用，也可以选中文字让 AI 帮你润色"></div>
+                </div>
+
+                <!-- AI 工具条 -->
+                <div class="rt-ai-bar">
+                    <span class="rt-ai-label"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg> AI</span>
+                    <button type="button" class="rt-btn ai" data-ai="polish" title="需先选中文字">润色</button>
+                    <button type="button" class="rt-btn ai" data-ai="expand" title="需先选中文字">扩写</button>
+                    <button type="button" class="rt-btn ai" data-ai="shorten" title="需先选中文字">精简</button>
+                    <button type="button" class="rt-btn ai" data-ai="translate" title="需先选中文字">翻译</button>
+                    <span class="rt-sep"></span>
+                    <button type="button" class="rt-btn ai" data-ai="summary">整篇摘要</button>
+                    <button type="button" class="rt-btn ai" data-ai="title">起个标题</button>
+                    <button type="button" class="rt-btn ai" data-ai="continue">续写</button>
+                    <button type="button" class="rt-btn ai" data-ai="todo">转成待办</button>
+                    <button type="button" class="rt-btn" data-ai="config" title="AI 提供商设置" aria-label="AI 提供商设置"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg></button>
+                </div>
+                <div class="rt-sel-hint" id="rtSelHint">提示：选中一段文字后再点「润色 / 扩写 / 精简 / 翻译」，结果会直接替换选中内容（可 Ctrl+Z 撤销）。</div>
+                <div style="margin-top:8px;">
+                    <input type="text" id="noteTagsInput" placeholder="标签：多个用逗号分隔，最多 8 个（如：家务, 购物清单）" aria-label="笔记标签">
+                </div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:8px;" id="noteMeta"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+    (function () {
+        renderShell('notes', '备忘手记');
+
+        let curPage = 1;
+        const pageSize = 8;
+        let currentId = null;
+        let curFormat = 'html';
+
+        const rt = document.getElementById('rtContent');
+        const titleInput = document.getElementById('noteTitleInput');
+
+        /* 页内图标常量（可信内部 SVG，走 uiEmpty 的 icon 参数） */
+        const NOTE_ICO = {
+            doc: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>'
+        };
+
+        /* ---------------- 列表 ---------------- */
+        async function loadNotes() {
+            const params = new URLSearchParams({
+                page: curPage, size: pageSize,
+                keyword: document.getElementById('filterKeyword').value.trim(),
+                startDate: document.getElementById('filterStartDate').value,
+                endDate: document.getElementById('filterEndDate').value,
+                tag: document.getElementById('filterTag').value
+            });
+            const r = await apiGet('/api/notes?' + params.toString());
+            const box = document.getElementById('notesList');
+            const pager = document.getElementById('notesPagination');
+            if (r.code !== 200) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({ size: 'block', text: '加载失败，请刷新重试' }));
+                return;
+            }
+            const { items, total } = r.data;
+            if (items.length === 0) {
+                // 空态双分支：区分「全局无笔记」与「筛选无结果」，避免误导
+                const filtering = !!(document.getElementById('filterKeyword').value.trim()
+                    || document.getElementById('filterStartDate').value
+                    || document.getElementById('filterEndDate').value
+                    || document.getElementById('filterTag').value);
+                box.innerHTML = '';
+                box.appendChild(filtering
+                    ? uiEmpty({
+                        size: 'block',
+                        title: '没有匹配的笔记',
+                        text: '换个关键词或日期范围试试',
+                        action: { text: '清除筛选', kind: 'ghost', onClick: function () { resetFilters(); } }
+                    })
+                    : uiEmpty({
+                        size: 'block',
+                        icon: NOTE_ICO.doc,
+                        title: '暂无笔记',
+                        text: '随手记录想法与待办，支持富文本与 AI 助手',
+                        action: { text: '新建第一条笔记', onClick: function () { createNewNote(); } }
+                    }));
+                pager.innerHTML = '';
+                return;
+            }
+            box.innerHTML = items.map(n => `
+                <div class="note-item ${n.id === currentId ? 'active' : ''} ${n.pinned ? 'pinned' : ''}" onclick="openNote(${n.id})">
+                    <div class="note-item-head">
+                        <h4>${n.pinned ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg> ' : ''}${escapeHtml(n.title || '无标题')}</h4>
+                        <button type="button" class="note-pin-btn" title="${n.pinned ? '取消置顶' : '置顶'}" aria-label="${n.pinned ? '取消置顶' : '置顶'}" onclick="event.stopPropagation();togglePinNote(${n.id}, ${n.pinned ? 'true' : 'false'})">${n.pinned ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>'}</button>
+                    </div>
+                    <p>${escapeHtml(n.excerpt || '') || '（空笔记）'}</p>
+                    ${(n.tags || []).length ? '<div class="note-tags">' + n.tags.map(t => `<button type="button" class="note-tag" data-tag="${escapeHtml(t)}" onclick="event.stopPropagation();clickTag(this.dataset.tag)" title="按标签「${escapeHtml(t)}」筛选">${escapeHtml(t)}</button>`).join('') + '</div>' : ''}
+                    <div class="note-time">${n.updatedAt || n.createdAt}</div>
+                </div>`).join('');
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+            if (totalPages <= 1) { pager.innerHTML = ''; return; }
+            let ph = '';
+            ph += `<button ${curPage <= 1 ? 'disabled' : ''} onclick="gotoPage(${curPage - 1})">‹</button>`;
+            for (let i = 1; i <= totalPages; i++) {
+                if (totalPages > 7 && i > 2 && i < totalPages - 1 && Math.abs(i - curPage) > 1) {
+                    if (i === 3) ph += '<span>…</span>';
+                    continue;
+                }
+                ph += `<button class="${i === curPage ? 'active' : ''}" onclick="gotoPage(${i})">${i}</button>`;
+            }
+            ph += `<button ${curPage >= totalPages ? 'disabled' : ''} onclick="gotoPage(${curPage + 1})">›</button>`;
+            ph += `<span>共 ${total} 条</span>`;
+            pager.innerHTML = ph;
+        }
+        window.gotoPage = function (p) { curPage = p; loadNotes(); };
+        window.searchNotes = function () { curPage = 1; loadNotes(); };
+        window.resetFilters = function () {
+            document.getElementById('filterKeyword').value = '';
+            document.getElementById('filterStartDate').value = '';
+            document.getElementById('filterEndDate').value = '';
+            document.getElementById('filterTag').value = '';
+            curPage = 1; loadNotes();
+        };
+        /* ---------------- 标签筛选 ---------------- */
+        async function refreshTagFilter() {
+            const r = await apiGet('/api/notes/tags');
+            if (r.code !== 200) return;
+            const sel = document.getElementById('filterTag');
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">全部标签</option>' +
+                r.data.map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count})</option>`).join('');
+            if (cur && r.data.some(t => t.name === cur)) sel.value = cur;
+        }
+        window.clickTag = function (tag) {
+            const sel = document.getElementById('filterTag');
+            if (![...sel.options].some(o => o.value === tag)) {
+                const op = document.createElement('option');
+                op.value = tag; op.textContent = tag;
+                sel.appendChild(op);
+            }
+            sel.value = tag; curPage = 1; loadNotes();
+        };
+        // 置顶 / 取消置顶：PUT /api/notes/:id 传 pinned（后端 GET 已按 pinned 优先排序）
+        window.togglePinNote = async function (id, currentlyPinned) {
+            const r = await apiPut('/api/notes/' + id, { pinned: !currentlyPinned });
+            if (r.code === 200) { showToast(currentlyPinned ? '已取消置顶' : '已置顶'); loadNotes(); }
+            else showToast((r && r.message) || '操作失败', 'error');
+        };
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        /* ---------------- 编辑器基础 ---------------- */
+        try { document.execCommand('styleWithCSS', false, false); } catch (e) { }
+
+        function isBlank() { return !rt.textContent.trim() && !rt.querySelector('img,hr'); }
+        function syncEmpty() { rt.classList.toggle('is-empty', isBlank()); }
+
+        function setContent(html, format) {
+            curFormat = format || 'html';
+            if (!html) { rt.innerHTML = ''; }
+            else if (curFormat === 'text') {
+                // 兼容旧的纯文本笔记：换行转换行，整体作为段落
+                rt.innerHTML = String(html).split('\n').map(l => '<p>' + escapeHtml(l) + '</p>').join('');
+            } else {
+                rt.innerHTML = (window.AICore ? AICore.sanitizeHtml(html) : html);
+            }
+            syncEmpty();
+        }
+        function getContent() {
+            if (isBlank()) return '';
+            // 单人换行统一成 <br> 由浏览器处理；此处仅去除纯空段落
+            return rt.innerHTML;
+        }
+        function plainOf(html) {
+            const d = document.createElement('div');
+            d.innerHTML = String(html || '');
+            return (d.textContent || '').trim();
+        }
+        function countWords() { return (rt.textContent || '').replace(/\s+/g, '').length; }
+
+        function restoreRange(r) {
+            if (!r) return;
+            const sel = window.getSelection();
+            sel.removeAllRanges(); sel.addRange(r);
+        }
+        function savedRange() {
+            const sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return null;
+            const r = sel.getRangeAt(0);
+            return rt.contains(r.commonAncestorContainer) ? r.cloneRange() : null;
+        }
+        function insertHtmlAt(html) {
+            rt.focus();
+            document.execCommand('insertHTML', false, html);
+            syncEmpty();
+        }
+
+        /* ---------------- 工具栏 ---------------- */
+        document.getElementById('rtToolbar').addEventListener('mousedown', e => e.preventDefault());
+        document.getElementById('rtToolbar').addEventListener('click', e => {
+            const btn = e.target.closest('button'); if (!btn) return;
+            rt.focus();
+            if (btn.dataset.block) {
+                document.execCommand('formatBlock', false, btn.dataset.block.toUpperCase());
+            } else if (btn.dataset.cmd === 'createLink') {
+                const url = prompt('请输入链接地址（http:// 或 https:// 开头）', 'https://');
+                if (url && /^https?:\/\//i.test(url)) document.execCommand('createLink', false, url);
+                else if (url) showToast('只支持 http/https 链接', 'warning');
+            } else if (btn.dataset.cmd) {
+                document.execCommand(btn.dataset.cmd, false, null);
+            }
+            syncEmpty(); markActive(); updateHint();
+        });
+        function markActive() {
+            ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'].forEach(c => {
+                const b = document.querySelector('.rt-btn[data-cmd="' + c + '"]');
+                if (!b) return;
+                let on = false; try { on = document.queryCommandState(c); } catch (e) { }
+                b.classList.toggle('active', on);
+            });
+        }
+        function updateHint() {
+            const sel = window.getSelection();
+            const hasSel = sel && sel.rangeCount && !sel.isCollapsed && rt.contains(sel.getRangeAt(0).commonAncestorContainer);
+            document.getElementById('rtSelHint').textContent = hasSel
+                ? '已选中 ' + sel.toString().trim().length + ' 个字，点「润色 / 扩写 / 精简 / 翻译」可直接替换选中内容。'
+                : '提示：选中一段文字后再点「润色 / 扩写 / 精简 / 翻译」，结果会直接替换选中内容（可 Ctrl+Z 撤销）。';
+        }
+        rt.addEventListener('keyup', () => { markActive(); updateHint(); });
+        rt.addEventListener('mouseup', updateHint);
+        rt.addEventListener('input', syncEmpty);
+        // 粘贴：保留基础格式但先净化，防止带入脚本与外链样式
+        rt.addEventListener('paste', e => {
+            const cd = e.clipboardData; if (!cd) return;
+            e.preventDefault();
+            const html = cd.getData('text/html');
+            const text = cd.getData('text/plain');
+            if (html && window.AICore) insertHtmlAt(AICore.sanitizeHtml(html));
+            else insertHtmlAt(escapeHtml(text).replace(/\n/g, '<br>'));
+        });
+        // Tab 键插入缩进而不是跳出编辑器
+        rt.addEventListener('keydown', e => {
+            if (e.key === 'Tab') { e.preventDefault(); document.execCommand('insertText', false, '    '); }
+            // Ctrl+S 保存
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveCurrentNote(); }
+        });
+        syncEmpty();
+
+        /* ---------------- AI 动作 ---------------- */
+        const AI_SYS_SEL = {
+            polish: '你是中文写作助手。请润色用户选中的文字：保持原意与信息量，让表达更通顺、准确、自然。只输出润色后的文字本身，不要解释、不要加引号、不要加标题。',
+            expand: '你是中文写作助手。请扩写用户选中的文字：保留原意，补充必要的细节、例子或说明，篇幅约为原文的 2 倍。只输出扩写后的文字本身，不要解释、不要加引号。',
+            shorten: '你是中文写作助手。请精简用户选中的文字：删除冗余与重复，保留全部关键信息，表达更紧凑。只输出精简后的文字本身，不要解释、不要加引号。',
+            translate: '你是翻译助手。若用户选中的是中文请翻译成地道英文，若是英文请翻译成流畅中文。只输出译文本身，不要解释、不要加引号。'
+        };
+        const AI_LABEL = { polish: '润色', expand: '扩写', shorten: '精简', translate: '翻译' };
+
+        document.querySelector('.rt-ai-bar').addEventListener('click', e => {
+            const btn = e.target.closest('[data-ai]'); if (!btn) return;
+            runAi(btn.dataset.ai);
+        });
+
+        async function runAi(kind) {
+            if (kind === 'config') { AICore.openSettings(); return; }
+            // 「转成待办」：直接创建今天的事务，不再走 AI 拆解插文本
+            if (kind === 'todo') { await convertNoteToTask(); return; }
+            if (!window.AICore) { showToast('AI 功能加载失败，请刷新页面重试', 'error'); return; }
+            if (!(await AICore.ensureProvider())) return;
+
+            const range = savedRange();
+            const selected = range ? range.toString() : '';
+            const selKinds = ['polish', 'expand', 'shorten', 'translate'];
+
+            if (selKinds.indexOf(kind) >= 0) {
+                if (!selected.trim()) { showToast('请先选中一段文字再使用「' + AI_LABEL[kind] + '」', 'warning'); return; }
+                showToast('AI 正在' + AI_LABEL[kind] + '…');
+                try {
+                    const out = await AICore.complete({
+                        prompt: selected, system: AI_SYS_SEL[kind],
+                        context: '用户正在「备忘手记」编辑一篇笔记，标题：' + (titleInput.value.trim() || '（未命名）')
+                    });
+                    restoreRange(range);
+                    const safe = AICore.sanitizeHtml(String(out || '').trim());
+                    // 用 insertHTML 替换选中区域：单段用行内，多段保留段落结构
+                    document.execCommand('insertHTML', false, /<(p|ul|ol|h[1-6]|blockquote|pre)\b/i.test(safe) ? safe : safe.replace(/\n+/g, ' '));
+                    syncEmpty(); markActive(); updateHint();
+                    showToast('已' + AI_LABEL[kind] + '并替换选中内容，可 Ctrl+Z 撤销');
+                } catch (err) {
+                    showToast('AI 调用失败：' + (err.message || err), 'error');
+                }
+                return;
+            }
+
+            // 整篇类动作
+            const body = plainOf(rt.innerHTML);
+            if (!body && kind !== 'title') { showToast('笔记还是空的，先写点内容吧', 'warning'); return; }
+            const sys = {
+                summary: '你是中文写作助手。请为用户这篇笔记写一份结构化摘要：先用一句话概括主旨，再用 3-5 条要点列出关键信息。使用 Markdown（短横线列表）输出。',
+                title: '你是中文编辑。请根据内容为这篇笔记起 3 个候选标题，风格简洁具体（12 字以内），用有序列表输出，不要其他解释。',
+                continue: '你是中文写作助手。请顺着用户笔记的内容与语气自然续写 2-3 段，保持风格一致，不要重复已有内容。直接输出续写正文。',
+                todo: '你是任务拆解助手。请把用户笔记里的待办事项提取成一份可执行清单：每条一行，格式为「- 事项（建议完成时间）」。如果笔记里没有明确待办，就根据内容合理推断 3-5 条。'
+            }[kind];
+
+            AICore.setInsertHandler(html => {
+                if (kind === 'title') {
+                    const first = html.replace(/<[^>]+>/g, '\n').split('\n').map(s => s.trim()).filter(Boolean)[0] || '';
+                    const t = first.replace(/^[\d.、\-\s]+/, '').slice(0, 40);
+                    if (t) { titleInput.value = t; showToast('已填入标题'); }
+                    return;
+                }
+                insertHtmlAt(html);
+                showToast('已插入到光标处');
+            });
+            await AICore.ask(body.slice(0, 4000), { system: sys, temperature: 0.5 });
+        }
+
+        /* ---------------- 转成待办：直接创建今天的事务 ---------------- */
+        async function convertNoteToTask() {
+            const title = (titleInput.value || '').trim();
+            const body = plainOf(rt.innerHTML);
+            if (!title && !body) { showToast('笔记还是空的，先写点内容吧', 'warning'); return; }
+            const taskTitle = title || ('笔记：' + (body.slice(0, 16) || '未命名'));
+            const remark = body.slice(0, 200); // 正文节选 ≤200 字
+            const r = await apiPost('/api/tasks', {
+                title: taskTitle,
+                date: todayStr(),
+                remark: remark
+            });
+            if (r.code === 200) showToast('已转成今天的待办事务 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>', 'success');
+            else showToast((r && r.message) || '创建待办失败', 'error');
+        }
+
+        /* ---------------- 移动端 列表/编辑 视图切换（FIX-18） ---------------- */
+        function enterNoteEdit() {
+            const flex = document.querySelector('.notes-flex');
+            if (flex) flex.classList.add('editing');
+            document.body.classList.add('notes-editing');
+        }
+        window.exitNoteEdit = function () {
+            const flex = document.querySelector('.notes-flex');
+            if (flex) flex.classList.remove('editing');
+            document.body.classList.remove('notes-editing');
+        };
+
+        /* ---------------- 笔记 CRUD ---------------- */
+        window.createNewNote = function () {
+            currentId = null;
+            document.getElementById('editorTitle').textContent = '新建笔记';
+            titleInput.value = '';
+            document.getElementById('noteTagsInput').value = '';
+            setContent('', 'html');
+            document.getElementById('noteMeta').textContent = '尚未保存';
+            document.getElementById('btnDelete').style.display = 'none';
+            enterNoteEdit();
+            loadNotes();
+            titleInput.focus();
+        };
+
+        window.openNote = async function (id) {
+            const r = await apiGet('/api/notes/' + id);
+            if (r.code !== 200) return showToast('加载失败', 'error');
+            const n = r.data;
+            currentId = id;
+            document.getElementById('editorTitle').textContent = '笔记编辑';
+            titleInput.value = n.title || '';
+            document.getElementById('noteTagsInput').value = (n.tags || []).join(', ');
+            setContent(n.content || '', n.format || 'text');
+            document.getElementById('noteMeta').textContent = `创建于 ${n.createdAt} · 最后更新 ${n.updatedAt}`;
+            document.getElementById('btnDelete').style.display = 'inline-flex';
+            enterNoteEdit();
+            loadNotes();
+        };
+
+        window.saveCurrentNote = async function () {
+            const content = getContent();
+            const data = {
+                title: titleInput.value.trim(), content: content, format: 'html',
+                tags: document.getElementById('noteTagsInput').value.split(/[,，]/).map(t => t.trim()).filter(Boolean)
+            };
+            if (!data.title && !plainOf(content)) return showToast('标题和内容不能都为空', 'warning');
+            const r = currentId ? await apiPut('/api/notes/' + currentId, data) : await apiPost('/api/notes', data);
+            if (r.code === 200) {
+                showToast('保存成功');
+                if (!currentId) currentId = r.data.id;
+                curFormat = r.data.format || 'html';
+                document.getElementById('noteMeta').textContent = `创建于 ${r.data.createdAt} · 最后更新 ${r.data.updatedAt} · ${countWords()} 字`;
+                document.getElementById('btnDelete').style.display = 'inline-flex';
+                refreshTagFilter();
+                loadNotes();
+            } else showToast(r.message || '保存失败', 'error');
+        };
+
+        window.deleteCurrentNote = async function () {
+            if (!currentId) return;
+            if (!(await confirmDel('确定删除这篇笔记吗？'))) return;
+            const r = await apiDelete('/api/notes/' + currentId);
+            if (r.code === 200) { showToast('删除成功'); createNewNote(); }
+        };
+
+        /* ---------------- 页面 AI 上下文 + 动作 ---------------- */
+        function aiReady(fn) {
+            const t = setInterval(() => {
+                if (window.AICore) { clearInterval(t); fn(); }
+            }, 60);
+            setTimeout(() => clearInterval(t), 5000);
+        }
+        aiReady(() => {
+            AICore.registerContext('notes', () => {
+                const t = titleInput.value.trim();
+                return t ? '正在编辑笔记「' + t + '」，正文约 ' + countWords() + ' 字'
+                         : '正在编辑一篇新建笔记，正文约 ' + countWords() + ' 字';
+            });
+            // 覆盖默认动作：把 AI 结果直接落到编辑器里
+            AICore.askActions.notes = [
+                { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', label: '帮我写一篇', apply: () => { AICore.drawerQuickAsk('帮我写一篇家庭生活备忘的草稿，主题是：'); } },
+                { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>', label: '总结我的笔记', apply: () => { AICore.drawerQuickAsk('根据我最近的笔记，帮我总结我最近在关注什么。'); } },
+                { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><circle cx="11" cy="11" r="2"/></svg>', label: '当前这篇摘要', apply: () => {
+                    const body = plainOf(rt.innerHTML);
+                    if (!body) return showToast('笔记还是空的', 'warning');
+                    AICore.setInsertHandler(html => { insertHtmlAt(html); showToast('已插入到光标处'); });
+                    AICore.ask(body.slice(0, 4000), { system: '你是中文写作助手。请为用户这篇笔记写一份结构化摘要：先用一句话概括主旨，再用 3-5 条要点列出关键信息。使用 Markdown（短横线列表）输出。', temperature: 0.4 });
+                } }
+            ];
+        });
+
+        loadNotes();
+        refreshTagFilter();
+    })();
+    </script>
+</body>
+</html>

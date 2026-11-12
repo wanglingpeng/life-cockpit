@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>使用洞察 - 生活驾驶舱</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+<link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+<link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+<style>
+  .ui-range{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+  .ui-range button{padding:7px 14px;border:1px solid var(--border);border-radius:99px;background:var(--bg-card);
+    color:var(--text-2);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;}
+  .ui-range button.on{background:var(--primary);border-color:var(--primary);color:#fff;}
+  /* 对比度 v1.48.37：面板是 135deg 渐变，正文压在「最亮端」#1e3a5f 才是最低点。
+     原 #94a3b8 在 #0f172a 有 6.96，但在 #1e3a5f 只有 4.49（差 0.01 不达标）。
+     统一抬到 #a1adc0：7.87 / 5.07，全渐变段过 AA。 */
+  .ui-ns{border-radius:18px;padding:18px;margin-bottom:14px;color:#fff;
+    background:linear-gradient(135deg,#0f172a,#1e3a5f);}
+  .ui-ns h3{margin:0 0 10px;font-size:14px;color:#a1adc0;font-weight:600;}
+  .ui-ns .big{font-size:38px;font-weight:800;line-height:1;letter-spacing:-1px;}
+  .ui-ns .big small{font-size:15px;font-weight:600;color:#a1adc0;margin-left:4px;}
+  .ui-ns .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.24);margin:14px 0 8px;overflow:hidden;}
+  .ui-ns .bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#22c55e,#4ade80);transition:width .5s;}
+  /* 超额完成：条满格 + 尾段条纹示意超出部分 */
+  .ui-ns .bar.over i{background:repeating-linear-gradient(90deg,#22c55e,#22c55e 8px,#16a34a 8px,#16a34a 16px);}
+  .ui-ns .meta{font-size:12.5px;color:#a1adc0;}
+  .ui-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
+  .ui-kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:13px 14px;}
+  .ui-kpi .k{font-size:12.5px;color:var(--text-2);margin-bottom:5px;}
+  .ui-kpi .v{font-size:23px;font-weight:800;line-height:1;color:var(--text);}
+  .ui-kpi .v small{font-size:12px;font-weight:600;color:var(--text-2);margin-left:2px;}
+  .ui-find{display:flex;gap:9px;padding:11px 13px;border-radius:12px;margin-bottom:8px;font-size:13.5px;line-height:1.55;}
+  .ui-find.red{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;}
+  .ui-find.yellow{background:#fffbeb;color:#92400e;border:1px solid #fde68a;}
+  .ui-find.green{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+  .ui-act{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .ui-act:last-child{border-bottom:none;}
+  .ui-act .nm{flex:1;min-width:0;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ui-act .tagx{font-size:12px;padding:1px 7px;border-radius:99px;background:var(--bg-inset);color:var(--text-2);flex-shrink:0;}
+  .ui-act .ct{font-weight:700;color:var(--text);min-width:42px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0;}
+  .ui-act .zero{color:var(--text-2);font-weight:400;}
+  .ui-spark{display:flex;align-items:flex-end;gap:3px;height:64px;margin:6px 0 2px;}
+  .ui-spark i{flex:1;background:var(--primary);border-radius:3px 3px 0 0;min-height:2px;opacity:.85;}
+  .ui-spark i.empty{background:var(--bg-inset);}
+  .ui-legend{font-size:12px;color:var(--text-2);display:flex;justify-content:space-between;}
+  /* v72 修复：主题挂在 <html data-theme> 上，原 body[data-theme] 为死选择器（暗色覆盖永不命中） */
+  [data-theme="dark"] .ui-find.red{background:#3b1414;color:#fca5a5;border-color:#7f1d1d;}
+  [data-theme="dark"] .ui-find.yellow{background:#3b2f14;color:#fcd34d;border-color:#78350f;}
+  [data-theme="dark"] .ui-find.green{background:#0f2e1a;color:#86efac;border-color:#166534;}
+  /* FIX-10：数据概览数字对比度加深、字号加大；v72：色值改走主题变量（原硬编码 #0f172a 在暗色下近黑压深卡不可读） */
+  .ui-kpi .v { font-size: 24px; color: var(--text); }
+  .ui-kpi .v small { color: var(--text-2); }
+  /* v72 修复：区间切换按钮触控高 33px<44 → 触屏下伪元素负 inset 扩热区（视觉尺寸不变） */
+  @media (pointer:coarse){ .ui-range button{position:relative;} .ui-range button::before{content:'';position:absolute;top:-6px;left:-4px;right:-4px;bottom:-6px;} }
+</style>
+
+
+</head>
+<body data-page="insights">
+<div id="appShell"></div>
+<div id="pageContent">
+  <div class="ui-range" id="uiRange">
+    <button data-d="7">近 7 天</button>
+    <button data-d="30" class="on">近 30 天</button>
+    <button data-d="90">近 90 天</button>
+  </div>
+  <div id="uiBody"><div class="card">加载中…</div></div>
+</div>
+<script src="/js/common.js?v=1.48.54"></script>
+<script src="/js/lunar.js?v=1.48.54"></script>
+<script src="/js/voice.js?v=1.48.54"></script>
+<script src="/js/pwa.js?v=1.48.54"></script>
+<script src="/js/telemetry.js?v=1.48.54"></script>
+<script>
+(function () {
+  var days = 30;
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+  function render(d) {
+    var ns = d.northStar, ac = d.active, rt = d.recordTotals;
+    var pctRaw = Math.round((ns.weeklyWrites / ns.target) * 100);
+    var pct = Math.min(100, pctRaw);
+    var over = ns.weeklyWrites > ns.target;
+    var html = '';
+
+    // 北极星卡
+    html += '<div class="ui-ns">'
+      + '<h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> 北极星进度 · 本周有效写入</h3>'
+      + '<div class="big">' + ns.weeklyWrites + '<small>/ ' + ns.target + ' 条</small></div>'
+      + '<div class="bar' + (over ? ' over' : '') + '"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="meta">' + (ns.met
+          ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 已达成本周目标' + (over ? '<span class="">（超额 ' + (ns.weeklyWrites - ns.target) + ' 条）</span>' : '') + '，产品处于「工具」状态'
+          : '距离目标还差 ' + (ns.target - ns.weeklyWrites) + ' 条（达成 ' + pctRaw + '%）') + '</div>'
+      + '</div>';
+
+    // KPI
+    html += '<div class="ui-grid">'
+      + '<div class="ui-kpi"><div class="k">活跃天数</div><div class="v">' + ac.activeDays + '<small>/ ' + ac.totalDays + ' 天</small></div></div>'
+      + '<div class="ui-kpi"><div class="k">活跃率</div><div class="v">' + ac.rate + '<small>%</small></div></div>'
+      + '<div class="ui-kpi"><div class="k">连续活跃</div><div class="v">' + ac.streak + '<small>天</small></div></div>'
+      + '<div class="ui-kpi"><div class="k">累计记录</div><div class="v">' + (rt.tasks + rt.notes + rt.ledger + rt.anniversaries + rt.scheduled + rt.expiry) + '<small>条</small></div></div>'
+      + '</div>';
+
+    // 结论（最重要）
+    if (d.findings && d.findings.length) {
+      html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg> 结论（人话版）</span></div>';
+      d.findings.forEach(function (f) { html += '<div class="ui-find ' + f.level + '">' + esc(f.text) + '</div>'; });
+      html += '</div>';
+    }
+
+    // 每日趋势
+    var max = 1;
+    d.daily.forEach(function (x) { if (x.total > max) max = x.total; });
+    html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> 每日行为量（写入 + 浏览）</span></div>'
+      + '<div class="ui-spark">';
+    d.daily.forEach(function (x) {
+      var h = Math.round((x.total / max) * 60);
+      html += '<i class="' + (x.total ? '' : 'empty') + '" style="height:' + Math.max(2, h) + 'px" title="' + x.date + '：写入 ' + x.count + ' / 共 ' + x.total + '"></i>';
+    });
+    html += '</div><div class="ui-legend"><span>' + d.from + '</span><span>' + d.to + '</span></div></div>';
+
+    // 动作明细
+    html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 核心动作调用（<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>=写入类）</span></div>';
+    d.actions.forEach(function (a) {
+      var pf = Object.keys(a.platforms || {}).map(function (p) { return ({ mobile: '手机', desktop: '电脑', tablet: '平板' })[p] || p; });
+      html += '<div class="ui-act"><span class="nm">' + (a.core ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> ' : '') + esc(a.label) + '</span>'
+        + (a.activeDays ? '<span class="tagx">' + a.activeDays + ' 天</span>' : '')
+        + (pf.length ? '<span class="tagx">' + pf.join('/') + '</span>' : '')
+        + '<span class="ct ' + (a.count ? '' : 'zero') + '">' + a.count + '</span></div>';
+    });
+    html += '</div>';
+
+    if (d.extraActions && d.extraActions.length) {
+      html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title">其他被调用的行为</span></div>';
+      d.extraActions.forEach(function (a) { html += '<div class="ui-act"><span class="nm">' + esc(a.key) + '</span><span class="ct">' + a.count + '</span></div>'; });
+      html += '</div>';
+    }
+
+    // 平台 + 数据存量
+    var pf = d.platforms || {};
+    html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> 访问平台分布</span></div>'
+      + '<div class="ui-act"><span class="nm">手机</span><span class="ct ' + ((pf.mobile) ? '' : 'zero') + '">' + (pf.mobile || 0) + '</span></div>'
+      + '<div class="ui-act"><span class="nm">电脑</span><span class="ct ' + ((pf.desktop) ? '' : 'zero') + '">' + (pf.desktop || 0) + '</span></div>'
+      + '<div class="ui-act"><span class="nm">平板</span><span class="ct ' + ((pf.tablet) ? '' : 'zero') + '">' + (pf.tablet || 0) + '</span></div>'
+      + '</div>';
+
+    html += '<div class="card"><div class="h-card-head"><span class="h-bar"></span><span class="h-card-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> 数据存量（全量累计）</span></div>'
+      + '<div class="ui-grid" style="margin:0">'
+      + '<div class="ui-kpi"><div class="k">事务</div><div class="v">' + rt.tasks + '</div></div>'
+      + '<div class="ui-kpi"><div class="k">手记</div><div class="v">' + rt.notes + '</div></div>'
+      + '<div class="ui-kpi"><div class="k">账单流水</div><div class="v">' + rt.ledger + '</div></div>'
+      + '<div class="ui-kpi"><div class="k">纪念日</div><div class="v">' + rt.anniversaries + '</div></div>'
+      + '<div class="ui-kpi"><div class="k">定时提醒</div><div class="v">' + rt.scheduled + '</div></div>'
+      + '<div class="ui-kpi"><div class="k">证件效期</div><div class="v">' + rt.expiry + '</div></div>'
+      + '</div></div>';
+
+    html += '<div class="card" style="font-size:12.5px;color:var(--text-2);line-height:1.7">'
+      + '本页只统计「次数」与「平台」，不采集任何记录内容。'
+      + '若要停用统计，可在「系统设置」关闭「使用统计」开关。</div>';
+
+    el('uiBody').innerHTML = html;
+  }
+
+  function load() {
+    el('uiBody').innerHTML = '<div class="card">加载中…</div>';
+    fetch('/api/insights/usage?days=' + days)   // 鉴权走同源 HttpOnly cookie，不再手写 Bearer
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || j.code !== 200) { el('uiBody').innerHTML = '<div class="card">' + esc((j && j.message) || '加载失败（需管理员登录）') + '</div>'; return; }
+        render(j.data);
+      })
+      .catch(function () { el('uiBody').innerHTML = '<div class="card">加载失败，请检查网络</div>'; });
+  }
+
+  el('uiRange').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    [].forEach.call(el('uiRange').children, function (x) { x.classList.remove('on'); });
+    b.classList.add('on'); days = +b.dataset.d; load();
+  });
+
+  window.addEventListener('DOMContentLoaded', function () {
+    if (window.renderShell) renderShell('insights', '使用洞察');
+    load();
+  });
+  if (document.readyState !== 'loading' && window.renderShell) { renderShell('insights', '使用洞察'); load(); }
+})();
+</script>
+</body>
+</html>

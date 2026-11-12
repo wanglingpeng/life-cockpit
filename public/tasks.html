@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一次性事务 - 生活驾驶舱</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%233b82f6'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>家</text></svg>">
+    <link rel="stylesheet" href="/css/theme/01-base.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/theme/02-late.css?v=1.48.54">
+    <link rel="stylesheet" href="/css/components.css?v=1.48.54">
+    <style>
+        /* 移动端首屏避让：压缩日历与事务面板顶部间距，使「普通事务/置顶事务/统计」切换标签上移出底部 Tab 栏遮挡带（P0 G1，仅 ≤768px 生效） */
+        @media (max-width: 768px) {
+            .tasks-flex { gap: 10px; }
+            .tasks-flex .calendar-container { padding: 12px; }
+            .tasks-flex .calendar-header { margin-bottom: 8px; }
+            .tasks-flex .header-row-top { margin-bottom: 8px; }
+            .tasks-flex .day-card { padding: 8px 10px; }
+        }
+    </style>
+
+
+<style>
+/* === v54·B3 收敛：公共交互增强已并入 theme/，此处仅保留本页专属规则 === */
+@media (max-width: 768px) {
+  .icon-btn, .iconbtn, .icon-button, .fp-icobtn, .rt-btn, .chip-x, .note-pin-btn, .notes-back-btn, .set-arrow, .tr-arrow, .h-addbtn, .ma-btn, .chip-btn, .share-icons span, .calendar-nav button { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .icon-btn svg, .iconbtn svg, .icon-button svg, .fp-icobtn svg, .rt-btn svg, .chip-x svg, .note-pin-btn svg, .notes-back-btn svg, .set-arrow svg, .tr-arrow svg { width: 20px; height: 20px; }
+}
+</style>
+
+</head>
+<body>
+    <div id="pageContent" style="display:none;">
+        <div class="tasks-flex">
+            <!-- 左侧：日历 -->
+            <div class="calendar-container" id="calendarContainer">
+                <div class="calendar-header">
+                    <h3 id="calendarTitle">--</h3>
+                    <div class="calendar-nav">
+                        <button onclick="prevMonth()" aria-label="上一月" title="上一月">&lt;</button>
+                        <button class="today-btn" onclick="goToday()">今天</button>
+                        <button onclick="nextMonth()" aria-label="下一月" title="下一月">&gt;</button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid"></div>
+                <div class="day-cards" id="dayCards"></div>
+            </div>
+
+            <!-- 右侧：事务面板 -->
+            <div class="task-panel">
+                <!-- 第1行：顶级导航（左） + 年份/导入/添加（右） -->
+                <div class="header-row header-row-top">
+                    <div class="nav-tabs">
+                        <button class="nav-tab active" data-nav="normal" onclick="switchNav('normal')">普通事务</button>
+                        <button class="nav-tab" data-nav="pinned" onclick="switchNav('pinned')">置顶事务</button>
+                        <button class="nav-tab" data-nav="stat" onclick="switchNav('stat')">统计</button>
+                    </div>
+                    <div class="nav-actions">
+                        <div class="task-search-wrapper">
+                            <input type="search" id="taskSearch" class="task-search-input"
+                                   placeholder="搜索事务…" aria-label="按关键字搜索事务" autocomplete="off">
+                        </div>
+                        <div class="task-year-select-wrapper" id="yearSelectWrapper">
+                            <button class="btn btn-secondary btn-xs" id="yearSelectBtn" onclick="toggleYearDropdown(event)" aria-haspopup="listbox" aria-label="选择年份">
+                                <span id="yearSelectLabel">2026年</span>
+                                <svg class="task-year-arrow" width="10" height="6" viewBox="0 0 10 6"><path d="M0 0l5 6 5-6z" fill="currentColor"></path></svg>
+                            </button>
+                            <div class="task-year-dropdown" id="yearDropdown"></div>
+                        </div>
+                        <button class="btn btn-outline btn-xs" onclick="openTaskImportModal()"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Excel 导入</button>
+                        <button class="btn btn-primary btn-xs" id="addTaskBtn" onclick="showAddTaskModal()">+ 添加事务</button>
+                    </div>
+                </div>
+
+                <div class="outer-card">
+                    <!-- 第2行：子Tab（左） + 辅助项（右） -->
+                    <div class="outer-card-header">
+                        <div class="header-row header-row-bottom">
+                            <div class="sub-tabs sub-tabs-normal" id="subTabsNormal">
+                                <button class="sub-tab active" data-tab="today" id="subTabToday" onclick="switchNormalTab('today')">当天</button>
+                                <button class="sub-tab" data-tab="month" onclick="switchNormalTab('month')">当月</button>
+                            </div>
+                            <div class="sub-tabs sub-tabs-pinned" id="subTabsPinned" style="display:none;">
+                                <span class="sub-title-gray">置顶事务</span>
+                            </div>
+                            <div class="sub-tabs sub-tabs-stat" id="subTabsStat" style="display:none;">
+                                <button class="sub-tab" data-dim="day" onclick="switchStatDim('day')">日</button>
+                                <button class="sub-tab" data-dim="week" onclick="switchStatDim('week')">周</button>
+                                <button class="sub-tab" data-dim="month" onclick="switchStatDim('month')">月</button>
+                                <button class="sub-tab" data-dim="quarter" onclick="switchStatDim('quarter')">季</button>
+                                <button class="sub-tab" data-dim="year" onclick="switchStatDim('year')">年</button>
+                            </div>
+                            <div class="header-row-right header-row-right-stat" id="headerRightStat" style="display:none;">
+                                <span class="detail-count-label">事务明细 (<span id="detailCount">0</span>)</span>
+                                <div class="page-size-wrapper" id="pageSizeWrapper">
+                                    <button class="btn btn-secondary btn-xs" id="pageSizeBtn" onclick="togglePageSizeDropdown(event)" aria-haspopup="listbox" aria-label="每页条数">
+                                        <span id="pageSizeLabel">10条</span>
+                                        <svg width="10" height="6" viewBox="0 0 10 6"><path d="M0 0l5 6 5-6z" fill="currentColor"></path></svg>
+                                    </button>
+                                    <div class="page-size-dropdown" id="pageSizeDropdown">
+                                        <div class="page-size-item active" data-size="10" onclick="selectPageSize(10)">10条</div>
+                                        <div class="page-size-item" data-size="20" onclick="selectPageSize(20)">20条</div>
+                                        <div class="page-size-item" data-size="50" onclick="selectPageSize(50)">50条</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 外层卡片主体 -->
+                    <div class="outer-card-body">
+                        <!-- 普通事务 -->
+                        <div id="normalTaskPage" class="nav-page active">
+                            <div class="inner-card">
+                                <div class="inner-card-body">
+                                    <div id="searchResultBar" class="search-result-bar" hidden></div>
+                                    <div id="normalTaskList"></div>
+                                    <div id="normalTaskPagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 置顶事务 -->
+                        <div id="pinnedTaskPage" class="nav-page">
+                            <div class="inner-card">
+                                <div class="inner-card-body">
+                                    <div id="pinnedTaskList"></div>
+                                    <div id="pinnedTaskPagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 统计 -->
+                        <div id="statPage" class="nav-page">
+                            <div class="stat-range-label" id="statRangeLabel"></div>
+                            <div class="stat-cards-row">
+                                <div class="stat-mini-card">
+                                    <div class="stat-mini-icon stat-icon-total"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></div>
+                                    <div class="stat-mini-meta">
+                                        <div class="stat-mini-value" id="statTotal">0</div>
+                                        <div class="stat-mini-label">总事务</div>
+                                    </div>
+                                </div>
+                                <div class="stat-mini-card">
+                                    <div class="stat-mini-icon stat-icon-pending"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 12 16"/></svg></div>
+                                    <div class="stat-mini-meta">
+                                        <div class="stat-mini-value" id="statPending">0</div>
+                                        <div class="stat-mini-label">待处理</div>
+                                    </div>
+                                </div>
+                                <div class="stat-mini-card">
+                                    <div class="stat-mini-icon stat-icon-doing"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+                                    <div class="stat-mini-meta">
+                                        <div class="stat-mini-value" id="statProgress">0</div>
+                                        <div class="stat-mini-label">进行中</div>
+                                    </div>
+                                </div>
+                                <div class="stat-mini-card">
+                                    <div class="stat-mini-icon stat-icon-done"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></div>
+                                    <div class="stat-mini-meta">
+                                        <div class="stat-mini-value" id="statDone">0</div>
+                                        <div class="stat-mini-label">已完成</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="inner-card">
+                                <div class="inner-card-body">
+                                    <div id="taskDetailList"></div>
+                                    <div id="taskDetailPagination"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑事务弹窗 -->
+    <div id="taskModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">新增事务</h3>
+                <button class="modal-close" onclick="closeModal('taskModal')" aria-label="关闭弹窗">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 事务类型切换 -->
+                <div class="task-type-tabs" id="taskTypeTabs">
+                    <button class="task-type-tab active" data-type="normal" onclick="switchTaskType('normal')">普通事务</button>
+                    <button class="task-type-tab" data-type="pinned" onclick="switchTaskType('pinned')">置顶事务</button>
+                </div>
+                <div class="form-group">
+                    <label>事务名称 * <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">（点 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg> 说话即可 AI 建单）</span></label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="tTitle" placeholder="请输入事务名称" aria-label="事务名称" style="flex:1;min-width:0;">
+                        <script data-voice-mic data-target="tTitle" data-ai="tasks"></script>
+                    </div>
+                </div>
+                <div class="form-row" id="dateTimeRow">
+                    <div class="form-group">
+                        <label>日期 <span id="dateRequired">*</span></label>
+                        <input type="date" id="tDate" aria-label="事务日期">
+                    </div>
+                    <div class="form-group">
+                        <label>提醒时间</label>
+                        <input type="time" id="tRemindTime" aria-label="提醒时间">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>状态</label>
+                        <select id="tStatus"></select>
+                        <a class="field-link" href="/general-config#statuses">管理状态 →</a>
+                    </div>
+                    <div class="form-group">
+                        <label>颜色标记</label>
+                        <select id="tColor">
+                            <option value="">默认</option>
+                            <option value="#ef4444">红色</option>
+                            <option value="#f59e0b">橙色</option>
+                            <option value="#3b82f6">蓝色</option>
+                            <option value="#8b5cf6">紫色</option>
+                            <option value="#10b981">绿色</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>项目 / 客户 <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">（工作事项填这里，首页自动显示 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> 标签）</span></label>
+                        <input type="text" id="tClient" placeholder="如：旌德林业 / 荆州河道局" aria-label="项目或客户" maxlength="40">
+                    </div>
+                    <div class="form-group">
+                        <label>关联家人</label>
+                        <select id="tMember" aria-label="关联家人"><option value="">全家人共用</option></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>下一步动作</label>
+                    <input type="text" id="tNextAction" placeholder="如：约周三试飞演示" aria-label="下一步动作" maxlength="80">
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="tRemark" rows="3" placeholder="备注信息（可选）" aria-label="事务备注"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('taskModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel 导入弹窗 -->
+    <div class="modal-overlay" id="taskImportModal">
+        <div class="modal" style="width:600px;">
+            <div class="modal-header">
+                <h3 class="modal-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Excel 导入一次性事务</h3>
+                <button class="modal-close" onclick="closeTaskImportModal()" aria-label="关闭导入弹窗">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div style="margin-bottom:16px;font-size:13px;color:var(--text-secondary);line-height:1.8;">
+                    <a href="javascript:void(0)" onclick="downloadTaskTemplate()" style="color:var(--primary);text-decoration:underline;font-weight:500;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg> 下载 Excel 模板（含下拉选项）</a>
+                </div>
+                <div style="margin-bottom:12px;padding:8px 12px;background:var(--primary-light);border-radius:6px;font-size:12px;color:var(--text-secondary);line-height:1.6;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 提示：单次最多导入 <strong>500</strong> 条数据，请确保文件格式正确（第一行为表头，第二行起为数据）
+                </div>
+                <div id="taskImportDropZone" class="import-drop-zone"
+                     onclick="document.getElementById('taskImportFileInput').click()"
+                     ondragover="event.preventDefault();this.classList.add('dragover')"
+                     ondragleave="this.classList.remove('dragover')"
+                     ondrop="event.preventDefault();this.classList.remove('dragover');handleTaskImportFile(event.dataTransfer.files[0])">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;opacity:0.4;margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <p style="margin:0 0 4px 0;font-size:14px;color:var(--text-primary);">点击选择文件或拖拽 Excel 到此处</p>
+                    <p style="margin:0;font-size:12px;color:var(--text-secondary);" id="taskImportFileName">未选择文件</p>
+                    <input type="file" id="taskImportFileInput" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleTaskImportFile(this.files[0])">
+                </div>
+                <div id="taskImportResult" style="display:none;margin-top:16px;max-height:200px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer" id="taskImportFooter">
+                <button class="btn btn-secondary" onclick="closeTaskImportModal()">取消</button>
+                <button class="btn btn-primary" id="taskImportStartBtn" onclick="startTaskImport()" disabled>开始导入</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/common.js?v=1.48.54"></script>
+    <script src="/js/lunar.js?v=1.48.54"></script>
+    <script src="/js/voice.js?v=1.48.54"></script>
+    <script src="/js/pwa.js?v=1.48.54"></script>
+    <script src="/js/telemetry.js?v=1.48.54"></script>
+    <script src="/js/ui.js?v=1.48.54"></script>
+    <script>
+        renderShell('tasks', '一次性事务');
+
+        /* 空态图标（可信内部 SVG，走 uiEmpty 的 icon 参数） */
+        var EMPTY_ICO = {
+            search: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+            clipboard: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+            chart: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>'
+        };
+
+        /* ---------------- 状态 ---------------- */
+        var nowD = new Date();
+        var currentYear = nowD.getFullYear();
+        var currentMonth = nowD.getMonth() + 1;
+        var selectedDate = todayStr();
+        var statuses = [];
+        var statusColorMap = {};
+
+        var currentNav = 'normal';       // normal | pinned | stat
+        var currentNormalTab = 'today';  // today | month
+        var currentStatDim = 'day';      // day | week | month | quarter | year
+
+        var taskDates = [];              // 有事务的日期
+        var dateStatusCounts = {};       // date -> {statusId: count}
+        var holidays = {};               // date -> {name, type}
+
+        var pageState = {
+            today: { page: 1, size: 20, total: 0 },
+            month: { page: 1, size: 20, total: 0 },
+            pinned: { page: 1, size: 20, total: 0 }
+        };
+        // 普通事务列表：滚动加载（首屏 size=50，滚动到底按 hasMore 累积翻页）
+        var NORMAL_PAGE_SIZE = 50;
+        var normalLoaded = [];
+        var normalHasMore = false;
+        var normalLoading = false;
+        var normalObserver = null;
+        var statTasks = [];
+        var statPage = 1, statTotalPages = 1, statPageSize = 10
+        ;
+        var editingId = null;
+        var editingPinned = false;
+        var importParsedRows = [];
+        /* P1-1：事务可关联家人（与周期事项/纪念日一致） */
+        var familyMembers = [];
+        var memberPrefillId = (function () {
+            var m = (location.search || '').match(/[?&]memberId=(\d+)/);
+            return m ? parseInt(m[1], 10) : 0;
+        })();
+        var fromScheduledId = (function () {
+            var m = (location.search || '').match(/[?&]fromScheduled=(\d+)/);
+            return m ? parseInt(m[1], 10) : 0;
+        })();
+
+        /* ---------------- 初始化 ---------------- */
+        async function init() {
+            await loadStatuses();
+            buildStatusColorMap();
+            await loadFamilyMembers();
+            await loadHolidays(currentYear);
+            await refreshMonth();
+            renderCalendar();
+            renderYearDropdown();
+            updateSubTabTodayLabel();
+            initCalendarKeyboard();
+            bindSearch();
+            bindTaskFormValidation();
+            loadNormalTasks();
+            if (fromScheduledId) prefillFromScheduled();
+        }
+
+        /* 循环事务 → 一次性：预填新建弹窗（跳转带入） */
+        async function prefillFromScheduled() {
+            var r = await apiGet('/api/scheduled-tasks');
+            var t = ((r.code === 200 && r.data) || []).find(function (x) { return x.id === fromScheduledId; });
+            if (!t) return;
+            showAddTaskModal();
+            document.getElementById('tTitle').value = t.name || '';
+            if (t.nextRun) document.getElementById('tDate').value = t.nextRun;
+            if (t.memberId) document.getElementById('tMember').value = String(t.memberId);
+            if (t.remark) document.getElementById('tRemark').value = String(t.remark).slice(0, 500);
+            showToast('已带入循环事务「' + (t.name || '') + '」，确认后保存');
+        }
+        /* 一次性 → 循环事务：跳转 scheduled-tasks 页预填 */
+        function toScheduled(id) { location.href = '/scheduled-tasks?fromTask=' + id; }
+
+        async function loadStatuses() {
+            var r = await apiGet('/api/statuses');
+            if (r.code === 200) statuses = r.data || [];
+            var sel = document.getElementById('tStatus');
+            if (sel) {
+                sel.innerHTML = (statuses.length ? statuses : [
+                    { id: 1, name: '待处理' }, { id: 2, name: '进行中' }, { id: 3, name: '已完成' }
+                ]).map(s => '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>').join('');
+            }
+        }
+        function buildStatusColorMap() {
+            statusColorMap = {};
+            statuses.forEach(s => { statusColorMap[s.id] = s.color || ''; });
+            if (!statusColorMap[1]) statusColorMap[1] = '#f59e0b';
+            if (!statusColorMap[2]) statusColorMap[2] = '#3b82f6';
+            if (!statusColorMap[3]) statusColorMap[3] = '#10b981';
+        }
+
+        /* ---------------- 家人关联（P1-1） ---------------- */
+        async function loadFamilyMembers() {
+            var r = await apiGet('/api/family');
+            familyMembers = (r.code === 200 && r.data) ? r.data : [];
+            var sel = document.getElementById('tMember');
+            if (sel) {
+                sel.innerHTML = '<option value="">全家人共用</option>' +
+                    familyMembers.map(m => '<option value="' + m.id + '">' + escapeHtml(m.name) + '</option>').join('');
+            }
+        }
+        function memberNameOf(id) {
+            if (!id) return '';
+            var m = familyMembers.find(x => x.id === id);
+            return m ? m.name : '';
+        }
+        function memberChipOf(id) {
+            var m = id ? familyMembers.find(x => x.id === id) : null;
+            if (!m) return '';
+            var avatar = (window.memberAvatarHtml && memberAvatarHtml(m)) || '';
+            return '<span class="task-member" title="关联家人">' + avatar + escapeHtml(m.name) + '</span>';
+        }
+        function statusName(id) {
+            var s = statuses.find(x => x.id === id);
+            return s ? s.name : ('状态' + id);
+        }
+        function statusColor(id) { return statusColorMap[id] || '#9aa0a6'; }
+
+        /* ---------------- 年份下拉 ---------------- */
+        function renderYearDropdown() {
+            var box = document.getElementById('yearDropdown');
+            if (!box) return;
+            var y = new Date().getFullYear();
+            var html = '';
+            for (var i = y + 5; i >= y - 10; i--) {
+                html += '<div class="task-year-item' + (i === currentYear ? ' active' : '') + '" onclick="selectYear(' + i + ')">' + i + '年</div>';
+            }
+            box.innerHTML = html;
+            document.getElementById('yearSelectLabel').textContent = currentYear + '年';
+        }
+        function toggleYearDropdown(e) {
+            if (e) e.stopPropagation();
+            document.getElementById('yearDropdown').classList.toggle('show');
+        }
+        function selectYear(y) {
+            currentYear = y;
+            document.getElementById('yearDropdown').classList.remove('show');
+            document.getElementById('yearSelectLabel').textContent = y + '年';
+            renderYearDropdown();
+            // 换年必须同步刷新月历视口（此前漏调导致月历停留在旧年月）
+            reloadMonthView(function () {
+                if (currentNav === 'stat') loadStatistics();
+                else loadNormalTasks();
+            });
+        }
+        function togglePageSizeDropdown(e) {
+            if (e) e.stopPropagation();
+            document.getElementById('pageSizeDropdown').classList.toggle('show');
+        }
+        function selectPageSize(n) {
+            statPageSize = n;
+            document.getElementById('pageSizeLabel').textContent = n + '条';
+            document.querySelectorAll('#pageSizeDropdown .page-size-item').forEach(el => {
+                el.classList.toggle('active', +el.dataset.size === n);
+            });
+            document.getElementById('pageSizeDropdown').classList.remove('show');
+            statPage = 1;
+            renderStatDetail();
+        }
+        document.addEventListener('click', function (e) {
+            var yd = document.getElementById('yearDropdown');
+            if (yd && !e.target.closest('#yearSelectWrapper')) yd.classList.remove('show');
+            var pd = document.getElementById('pageSizeDropdown');
+            if (pd && !e.target.closest('#pageSizeWrapper')) pd.classList.remove('show');
+        });
+
+        /* ---------------- 节假日 ---------------- */
+        var holidayCache = {};           // year -> { date: {name,type} }，按年缓存避免重复请求
+        async function loadHolidays(year) {
+            if (holidayCache[year]) { holidays = holidayCache[year]; return holidays; }
+            try {
+                var r = await apiGet('/api/holiday?year=' + year);
+                if (r.code === 200 && r.data) { holidayCache[year] = r.data || {}; holidays = holidayCache[year]; }
+            } catch (e) { holidays = {}; }
+            return holidays;
+        }
+        function holidayOf(ds) { return holidays[ds] || null; }
+
+        /* ---------------- 日历 ---------------- */
+        async function refreshMonth() {
+            var r = await apiGet('/api/tasks/calendar-month-data?year=' + currentYear + '&month=' + currentMonth);
+            if (r.code === 200 && r.data) {
+                taskDates = r.data.dates || Object.keys(r.data).filter(k => k.indexOf('-') === 4);
+                dateStatusCounts = r.data.statusCounts || {};
+                // 兼容旧结构 {date:{total,done}}
+                if (!r.data.dates && !r.data.statusCounts) {
+                    taskDates = Object.keys(r.data);
+                    dateStatusCounts = {};
+                }
+            } else {
+                taskDates = []; dateStatusCounts = {};
+            }
+        }
+
+        /** 重载当前月视图：月数据 → 节假日（按年缓存，等待完成）→ 重绘日历 */
+        function reloadMonthView(done) {
+            return refreshMonth()
+                .then(function () { return loadHolidays(currentYear); })
+                .then(function () {
+                    renderCalendar();
+                    updateSubTabTodayLabel();
+                    if (typeof done === 'function') done();
+                });
+        }
+
+        function renderCalendar() {
+            document.getElementById('calendarTitle').textContent = currentYear + '年' + currentMonth + '月';
+            var grid = document.getElementById('calendarGrid');
+            // 周起始为周一（中文习惯）
+            var weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+            var h = weekdays.map(w => '<div class="calendar-weekday">' + w + '</div>').join('');
+            var first = new Date(currentYear, currentMonth - 1, 1);
+            var start = (first.getDay() + 6) % 7;    // 周一 = 0 … 周日 = 6
+            var today = todayStr();
+
+            // 固定 42 格；每格带真实日期（相邻月日期也可点击跳月）
+            var cells = [];
+            var cursor = new Date(currentYear, currentMonth - 1, 1 - start);
+            for (var i = 0; i < 42; i++) {
+                var dt = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + i);
+                cells.push({
+                    d: dt.getDate(),
+                    cur: dt.getFullYear() === currentYear && dt.getMonth() === currentMonth - 1,
+                    date: dt.getFullYear() + '-' + pad2(dt.getMonth() + 1) + '-' + pad2(dt.getDate())
+                });
+            }
+
+            cells.forEach(function (c) {
+                var date = c.date;
+                var isToday = c.cur && date === today;
+                var cls = ['calendar-day'];
+                if (!c.cur) cls.push('other');
+                if (isToday) cls.push('today');
+                if (date === selectedDate) cls.push('selected');
+
+                // 注释文本（仅本月格显示）：今天 > 节假日首日 > 每月 1 日 > 农历
+                var sub = '';
+                if (c.cur) {
+                    var hol = holidayOf(date);
+                    var holStart = false;
+                    if (hol && hol.name) {
+                        // 连续假期只在首日显示名称：向前回溯 7 天查找同名节日
+                        // （回溯而非只比前一天，避免"国庆-中秋-国庆"这类夹花假期重复显示）
+                        holStart = true;
+                        for (var back = 1; back <= 7; back++) {
+                            var pd = new Date(currentYear, currentMonth - 1, c.d - back);
+                            var pds = pd.getFullYear() + '-' + pad2(pd.getMonth() + 1) + '-' + pad2(pd.getDate());
+                            var prevHol = holidayOf(pds);
+                            if (prevHol && prevHol.name === hol.name) { holStart = false; break; }
+                        }
+                    }
+                    if (isToday) {
+                        sub = '<span class="day-today-tag">今天</span>';
+                    } else if (holStart) {
+                        sub = '<span class="day-holiday">' + escapeHtml(hol.name) + '</span>';
+                    } else if (c.d === 1) {
+                        sub = '<span>' + currentMonth + '月</span>';
+                    } else {
+                        try {
+                            var l = solarToLunar(new Date(currentYear, currentMonth - 1, c.d));
+                            sub = '<span>' + (l.day === 1 ? (l.isLeap ? '闰' : '') + l.monthStr + '月' : l.dayStr) + '</span>';
+                        } catch (e) { sub = ''; }
+                    }
+                }
+
+                // 状态点：每种状态一个点（按状态色），超过 3 种显示 +N
+                var dots = '';
+                var taskCount = 0;
+                var sm = dateStatusCounts[date];
+                if (sm) {
+                    var ids = Object.keys(sm).filter(k => sm[k] > 0).map(Number).sort((a, b) => a - b);
+                    var total = 0; ids.forEach(id => { total += sm[id]; });
+                    taskCount = total;
+                    if (total > 0) {
+                        var dotHtml = ids.slice(0, 3).map(id => '<i style="background:' + statusColor(id) + '"></i>').join('');
+                        if (ids.length > 3) dotHtml += '<i class="dot-more">+' + (ids.length - 3) + '</i>';
+                        var tip = ids.map(id => statusName(id) + ' ' + sm[id]).join(' · ');
+                        dots = '<div class="task-dots" title="' + escapeHtml(tip) + '">' + dotHtml + '</div>';
+                    }
+                }
+
+                var dd = new Date(date + 'T00:00:00');
+                var holA = holidayOf(date);
+                var ariaLabel = dd.getFullYear() + '年' + (dd.getMonth() + 1) + '月' + dd.getDate() + '日 ' + weekCN(dd)
+                    + (c.cur && holA && holA.type === 'holiday' ? '，' + holA.name + '（法定节假日，休息）' : (c.cur && holA && holA.name ? ' ' + holA.name : ''))
+                    + '，' + taskCount + ' 项事务'
+                    + (c.cur ? '' : '（点击切换到该月）');
+                var tabIdx = (c.cur && date === selectedDate) ? '0' : '-1';
+                h += '<button type="button" class="' + cls.join(' ') + '" data-date="' + date + '" tabindex="' + tabIdx + '"'
+                    + ' aria-label="' + escapeHtml(ariaLabel) + '"'
+                    + ' onclick="gotoDate(\'' + date + '\')"'
+                    + ' ondblclick="quickAddTask(\'' + date + '\')">'
+                    + '<span class="day-num">' + c.d + '</span>'
+                    + '<div class="day-lunar">' + sub + '</div>'
+                    + dots + '</button>';
+            });
+            grid.innerHTML = h;
+            // 若本月无选中日（如选中日不在当前视口），把 roving tabindex 落到首个本月格
+            if (!grid.querySelector('.calendar-day[tabindex="0"]')) {
+                var firstCur = grid.querySelector('.calendar-day:not(.other)[data-date]');
+                if (firstCur) firstCur.setAttribute('tabindex', '0');
+            }
+            renderDayCards();
+        }
+
+        /** 日历下方：当天事务摘要卡片 */
+        function renderDayCards() {
+            var box = document.getElementById('dayCards');
+            if (!box || !selectedDate) { if (box) box.innerHTML = ''; return; }
+            var sm = dateStatusCounts[selectedDate];
+            var total = 0;
+            if (sm) Object.keys(sm).forEach(k => total += sm[k]);
+            var hol = holidayOf(selectedDate);
+            var d = new Date(selectedDate + 'T00:00:00');
+            var lunar = '';
+            try { lunar = lunarStrOf(d); } catch (e) { }
+            var holTag = (hol && hol.name) ? ' · <span class="day-holiday">' + escapeHtml(hol.name) + '</span>' : '';
+            box.innerHTML =
+                '<div class="day-card">'
+                + '<div class="day-card-line">'
+                + '<span class="day-card-date">' + selectedDate.replace(/-/g, '/') + ' <span class="day-card-week">' + weekCN(d) + '</span></span>'
+                + (lunar ? '<span class="day-card-lunar">' + lunar + '</span>' : '')
+                + holTag
+                + '<span class="day-card-stat">当日 <strong>' + total + '</strong> 项</span>'
+                + '<button type="button" class="btn btn-secondary btn-xs" onclick="showAddTaskModal()" aria-label="新建当日事务">＋ 新建</button>'
+                + '</div>'
+                + (total > 0 ? statusLegendHtml() : '')
+                + '</div>'
+                + '<div class="day-extras">'
+                + '<div class="ticker-head" onclick="toggleTicker()"><span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> 今日小签 · 趣味参考</span><span class="ticker-caret">▾</span></div>'
+                + '<div class="ticker-body" id="tickerBody">'
+                + '<div class="ticker-grid">'
+                + '<div class="ticker-block">' + horoscopeCardHtml(d) + '</div>'
+                + '<div class="ticker-block ticker-block-almanac">' + almanacCardHtml(d) + '</div>'
+                + '</div></div></div>';
+            // 默认折叠今日小签（趣味参考，不占首屏）；用户主动展开后记 localStorage
+            try {
+                var tb0 = document.getElementById('tickerBody');
+                if (tb0) tb0.style.display = 'none';
+                var tc0 = document.querySelector('.ticker-caret');
+                if (tc0) tc0.textContent = '▸';
+                if (localStorage.getItem('tickerOpen') === '1') {
+                    if (tb0) tb0.style.display = '';
+                    if (tc0) tc0.textContent = '▾';
+                }
+            } catch (e) { }
+        }
+        function toggleTicker() {
+            var b = document.getElementById('tickerBody');
+            if (!b) return;
+            var open = b.style.display !== 'none';
+            b.style.display = open ? 'none' : '';
+            var c = document.querySelector('.ticker-caret');
+            if (c) c.textContent = open ? '▸' : '▾';
+            try { localStorage.setItem('tickerOpen', open ? '0' : '1'); } catch (e) { }
+        }
+
+        /* ================= 当日星座运势（趣味参考，本地确定性生成） ================= */
+        var SIGN_START = [[3, 21, '白羊座', '♈'], [4, 20, '金牛座', '♉'], [5, 21, '双子座', '♊'], [6, 22, '巨蟹座', '♋'],
+            [7, 23, '狮子座', '♌'], [8, 23, '处女座', '♍'], [9, 23, '天秤座', '♎'], [10, 24, '天蝎座', '♏'],
+            [11, 23, '射手座', '♐'], [12, 22, '摩羯座', '♑'], [1, 20, '水瓶座', '♒'], [2, 19, '双鱼座', '♓']];
+        var SIGN_RANGE = { '白羊座': '3.21-4.19', '金牛座': '4.20-5.20', '双子座': '5.21-6.21', '巨蟹座': '6.22-7.22', '狮子座': '7.23-8.22', '处女座': '8.23-9.22', '天秤座': '9.23-10.23', '天蝎座': '10.24-11.22', '射手座': '11.23-12.21', '摩羯座': '12.22-1.19', '水瓶座': '1.20-2.18', '双鱼座': '2.19-3.20' };
+        function signOf(m, d) {
+            var tk = m * 100 + d, best = '摩羯座', bestK = -1;
+            SIGN_START.forEach(function (s) { var k = s[0] * 100 + s[1]; if (k <= tk && k > bestK) { bestK = k; best = s[2]; } });
+            return best;
+        }
+        function hashStr(s) {
+            var h = 2166136261;
+            for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+            return h >>> 0;
+        }
+        /** 确定性伪随机：同一天 + 同一星座结果恒定（取值恒为非负） */
+        function seededPick(seed, arr) { return arr[((seed % arr.length) + arr.length) % arr.length]; }
+        var HORO_TEXT = [
+            '今天节奏平稳，把最重要的一两件事先做完，剩下的顺水推舟即可。',
+            '适合处理积压的小事，收尾会比开新头更让你有成就感。',
+            '沟通运不错，卡住的事情打个电话或当面聊一句就能推进。',
+            '留意细节，尤其是数字和约定时间，核对一遍能省掉后面的麻烦。',
+            '体力精力都在线，适合把难啃的任务放在今天攻坚。',
+            '情绪略浮躁，重要决定放一放，先把手头的事做扎实。',
+            '贵人运在线，遇到难题主动开口，比一个人闷头硬扛有效得多。',
+            '适合整理与规划：列个清单、清一清桌面，思路会跟着清晰起来。',
+            '财运平稳，理性消费为主，冲动下单前先给自己 10 分钟冷静期。',
+            '今天容易分心，试试番茄钟，专注 25 分钟再休息效率会高很多。',
+            '家庭运不错，抽点时间陪家人聊聊天，比刷手机更解压。',
+            '小有惊喜的一天，可能是久未联系的朋友，也可能是意外的小收获。'
+        ];
+        function horoscopeCardHtml(d) {
+            var m = d.getMonth() + 1, dd = d.getDate();
+            var sign = signOf(m, dd);
+            var seed = hashStr(selectedDate + '|' + sign);
+            // 全程用 >>> 无符号右移：>> 会把 ≥2^31 的哈希值变成负数，取模后出现负数/undefined
+            var stars = function (n) {
+                var s = '<span class="stars">';
+                for (var i = 1; i <= 5; i++) s += i <= n ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' : '<i class="off"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></i>';
+                return s + '</span>';
+            };
+            var love = 2 + ((seed >>> 2) % 4), career = 2 + ((seed >>> 7) % 4), wealth = 2 + ((seed >>> 12) % 4);
+            var colors = ['红色', '橙色', '黄色', '绿色', '青色', '蓝色', '紫色', '粉色', '白色', '黑色', '棕色', '金色'];
+            var luckColor = colors[(seed >>> 17) % colors.length];
+            var luckNum = 1 + ((seed >>> 22) % 9);
+            var signs = ['白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座', '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座'];
+            var pool = signs.filter(x => x !== sign);
+            var match = pool[(seed >>> 27) % pool.length];
+            var icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z"/></svg>';
+            SIGN_START.forEach(function (s) { if (s[2] === sign) icon = s[3]; });
+            return '<div class="tick-row">'
+                + '<span class="tick-sign">' + icon + ' ' + sign + '</span>'
+                + '<span>爱情 ' + stars(love) + '</span>'
+                + '<span>事业 ' + stars(career) + '</span>'
+                + '<span>财富 ' + stars(wealth) + '</span>'
+                + '</div>';
+        }
+
+        /* ================= 当日黄历宜忌（按干支 + 建除十二神推算，供参考） ================= */
+        var GAN = '甲乙丙丁戊己庚辛壬癸', ZHI = '子丑寅卯辰巳午未申酉戌亥';
+        var ZHI_SHENG = { '子': '鼠', '丑': '牛', '寅': '虎', '卯': '兔', '辰': '龙', '巳': '蛇', '午': '马', '未': '羊', '申': '猴', '酉': '鸡', '戌': '狗', '亥': '猪' };
+        var ZHI12 = ['建', '除', '满', '平', '定', '执', '破', '危', '成', '收', '开', '闭'];
+        /* 十二节（每月节气的近似日期，用于定月建；年份差异 ±1 天） */
+        var JIE = [[2, 4, '寅'], [3, 6, '卯'], [4, 5, '辰'], [5, 6, '巳'], [6, 6, '午'], [7, 7, '未'],
+            [8, 8, '申'], [9, 8, '酉'], [10, 8, '戌'], [11, 7, '亥'], [12, 7, '子'], [1, 6, '丑']];
+        var YIJI = {
+            '建': { yi: ['出行', '上任', '会友', '上书', '见工'], ji: ['动土', '开仓', '嫁娶', '词讼'] },
+            '除': { yi: ['沐浴', '清洁', '除旧', '治病', '祭祀'], ji: ['嫁娶', '赴任', '开市', '出行'] },
+            '满': { yi: ['祭祀', '祈福', '纳采', '开市', '结亲'], ji: ['服药', '求医', '上任', '安葬'] },
+            '平': { yi: ['修造', '平整', '修路', '粉刷'], ji: ['词讼', '开渠', '种植', '出行'] },
+            '定': { yi: ['订婚', '嫁娶', '纳财', '立约', '安床'], ji: ['诉讼', '出行', '求医', '搬迁'] },
+            '执': { yi: ['祈福', '祭祀', '结婚', '捕捉'], ji: ['搬家', '开业', '出行', '安葬'] },
+            '破': { yi: ['拆除', '破屋', '求医', '治病'], ji: ['嫁娶', '签约', '开市', '出行'] },
+            '危': { yi: ['安床', '祭祀', '修缮'], ji: ['登高', '行船', '出行', '嫁娶'] },
+            '成': { yi: ['开业', '嫁娶', '入学', '签约', '搬家'], ji: ['诉讼', '争执', '词讼'] },
+            '收': { yi: ['纳财', '买入', '收藏', '收获'], ji: ['出行', '开市', '安葬', '置产'] },
+            '开': { yi: ['开业', '求职', '见贵', '出行', '结婚'], ji: ['安葬', '破土', '修坟'] },
+            '闭': { yi: ['安葬', '修坟', '填井', '打扫'], ji: ['开业', '出行', '嫁娶', '动土'] }
+        };
+        function jdnOf(y, m, d) {
+            var a = Math.floor((14 - m) / 12), yy = y + 4800 - a, mm = m + 12 * a - 3;
+            return d + Math.floor((153 * mm + 2) / 5) + 365 * yy + Math.floor(yy / 4) - Math.floor(yy / 100) + Math.floor(yy / 400) - 32045;
+        }
+        /** 日干支：以 1949-10-01 甲子日为锚点 */
+        function dayGanzhi(y, m, d) {
+            var idx = ((jdnOf(y, m, d) - 2433191) % 60 + 60) % 60;
+            return { gan: GAN.charAt(idx % 10), zhi: ZHI.charAt(idx % 12), idx: idx };
+        }
+        /** 月建（日支 == 月支 为「建」日）：取不晚于当日的最近一个十二节 */
+        function monthBranchOf(y, m, d) {
+            var target = y * 10000 + m * 100 + d, best = -1, cur = '寅';
+            for (var yy = y - 1; yy <= y; yy++) {
+                JIE.forEach(function (j) {
+                    var k = yy * 10000 + j[0] * 100 + j[1];
+                    // 必须取「日期最大且不晚于当日」的一个：1 月小寒在数组末尾，若按顺序覆盖会把已选中的后续月份冲掉
+                    if (k <= target && k > best) { best = k; cur = j[2]; }
+                });
+            }
+            return cur;
+        }
+        function almanacOf(dateStr) {
+            var p = dateStr.split('-').map(Number);
+            var y = p[0], m = p[1], d = p[2];
+            var gz = dayGanzhi(y, m, d);
+            var zhiIdx = ZHI.indexOf(gz.zhi);
+            var mbIdx = ZHI.indexOf(monthBranchOf(y, m, d));
+            var god = ZHI12[((zhiIdx - mbIdx) % 12 + 12) % 12];
+            var chongZhi = ZHI.charAt((zhiIdx + 6) % 12);
+            var yiji = YIJI[god];
+            return { gz: gz.gan + gz.zhi, god: god, chong: '冲' + ZHI_SHENG[chongZhi] + '（' + chongZhi + '）', yi: yiji.yi, ji: yiji.ji };
+        }
+        function almanacCardHtml(d) {
+            var a = almanacOf(selectedDate);
+            return '<div class="tick-row tick-almanac">'
+                + '<span class="yi">宜 ' + a.yi.join('、') + '</span>'
+                + '<span class="ji">忌 ' + a.ji.join('、') + '</span>'
+                + '</div>';
+        }
+        /** 状态点图例（复用 statusColorMap / statusName，动态跟随自定义状态） */
+        function statusLegendHtml() {
+            var ids = (statuses.length ? statuses.map(s => s.id) : [1, 2, 3]).slice(0, 5);
+            return '<div class="day-legend">' + ids.map(id =>
+                '<span><i style="background:' + statusColor(id) + '"></i>' + escapeHtml(statusName(id)) + '</span>'
+            ).join('') + '</div>';
+        }
+
+        function prevMonth() {
+            currentMonth--;
+            if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+            renderYearDropdown();
+            reloadMonthView(function () {
+                if (currentNav === 'normal') loadNormalTasks();
+            });
+        }
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+            renderYearDropdown();
+            reloadMonthView(function () {
+                if (currentNav === 'normal') loadNormalTasks();
+            });
+        }
+        function goToday() {
+            var d = new Date();
+            currentYear = d.getFullYear(); currentMonth = d.getMonth() + 1;
+            selectedDate = todayStr();
+            renderYearDropdown();
+            reloadMonthView(function () {
+                if (currentNav === 'normal') loadNormalTasks();
+            });
+        }
+        /** 选中日期；若目标日期不在当前月视图内（点击相邻月日期）则先切换月份视口 */
+        function gotoDate(date) {
+            var d = new Date(date + 'T00:00:00');
+            var needSwitch = d.getFullYear() !== currentYear || (d.getMonth() + 1) !== currentMonth;
+            if (!needSwitch) { selectDate(date); return; }
+            selectedDate = date;
+            currentYear = d.getFullYear(); currentMonth = d.getMonth() + 1;
+            renderYearDropdown();
+            reloadMonthView(function () {
+                if (currentNav === 'normal' && currentNormalTab === 'today') loadNormalTasks();
+                if (window.innerWidth <= 900) scrollToTaskPanel();
+            });
+        }
+        /** 移动端：把右侧事务面板带入视野，避免"点了没反应"的错觉 */
+        function scrollToTaskPanel() {
+            var panel = document.querySelector('.task-panel');
+            if (!panel) return;
+            setTimeout(function () { try { panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { } }, 160);
+        }
+        function selectDate(date) {
+            selectedDate = date;
+            renderCalendar();
+            updateSubTabTodayLabel();
+            // 不重置「当天/当月」子 Tab：仅当处于「当天」视图时刷新该日列表
+            if (currentNav === 'normal' && currentNormalTab === 'today') loadNormalTasks();
+            if (window.innerWidth <= 900) scrollToTaskPanel();
+        }
+        /** 「当天」子 Tab 显示当前所选日期 */
+        function updateSubTabTodayLabel() {
+            var el = document.getElementById('subTabToday');
+            if (!el) return;
+            var isToday = selectedDate === todayStr();
+            el.textContent = isToday ? '当天' : '当天 · ' + selectedDate.slice(5).replace('-', '/');
+        }
+
+        /* ---------------- 日历键盘可达 ---------------- */
+        function focusCalendarCell() {
+            var grid = document.getElementById('calendarGrid');
+            if (!grid) return;
+            var cell = grid.querySelector('.calendar-day[tabindex="0"]') || grid.querySelector('.calendar-day[data-date]');
+            if (cell) { try { cell.focus(); } catch (e) { } }
+        }
+        function initCalendarKeyboard() {
+            var grid = document.getElementById('calendarGrid');
+            if (!grid) return;
+            grid.addEventListener('keydown', function (e) {
+                var cur = e.target.closest && e.target.closest('.calendar-day[data-date]');
+                if (!cur) return;
+                // Enter / Space 交由原生 button 触发 onclick
+                if (e.key === 'Enter' || e.key === ' ') return;
+                if (e.key === 't' || e.key === 'T' || e.key === 'Home') {
+                    e.preventDefault(); goToday(); setTimeout(focusCalendarCell, 90); return;
+                }
+                var delta = 0;
+                if (e.key === 'ArrowLeft') delta = -1;
+                else if (e.key === 'ArrowRight') delta = 1;
+                else if (e.key === 'ArrowUp') delta = -7;
+                else if (e.key === 'ArrowDown') delta = 7;
+                else return;
+                e.preventDefault();
+                var nd = new Date(cur.dataset.date + 'T00:00:00');
+                nd.setDate(nd.getDate() + delta);
+                var nds = nd.getFullYear() + '-' + pad2(nd.getMonth() + 1) + '-' + pad2(nd.getDate());
+                selectedDate = nds;
+                if (nd.getMonth() + 1 !== currentMonth || nd.getFullYear() !== currentYear) {
+                    // 跨月：切换月份视口后聚焦到目标日
+                    currentYear = nd.getFullYear(); currentMonth = nd.getMonth() + 1;
+                    renderYearDropdown();
+                    reloadMonthView(function () {
+                        focusCalendarCell();
+                        if (currentNav === 'normal' && currentNormalTab === 'today') loadNormalTasks();
+                    });
+                } else {
+                    selectDate(nds);
+                    focusCalendarCell();
+                }
+            });
+        }
+
+        /* ---------------- 顶部导航切换 ---------------- */
+        function switchNav(nav, skipLoad) {
+            if (nav !== 'normal') resetSearchUI();
+            currentNav = nav;
+            document.querySelectorAll('.nav-tab').forEach(el =>
+                el.classList.toggle('active', el.dataset.nav === nav));
+            // 页面切换用 active 类（.nav-page 默认 display:none）
+            document.getElementById('normalTaskPage').classList.toggle('active', nav === 'normal');
+            document.getElementById('pinnedTaskPage').classList.toggle('active', nav === 'pinned');
+            document.getElementById('statPage').classList.toggle('active', nav === 'stat');
+            document.getElementById('subTabsNormal').style.display = nav === 'normal' ? '' : 'none';
+            document.getElementById('subTabsPinned').style.display = nav === 'pinned' ? '' : 'none';
+            document.getElementById('subTabsStat').style.display = nav === 'stat' ? '' : 'none';
+            document.getElementById('headerRightStat').style.display = nav === 'stat' ? '' : 'none';
+            document.getElementById('addTaskBtn').style.display = nav === 'stat' ? 'none' : '';
+
+            if (skipLoad) return;
+            if (nav === 'normal') loadNormalTasks();
+            else if (nav === 'pinned') loadPinnedTasks();
+            else loadStatistics();
+        }
+        function switchNormalTab(tab) {
+            currentNormalTab = tab;
+            document.querySelectorAll('#subTabsNormal .sub-tab').forEach(el =>
+                el.classList.toggle('active', el.dataset.tab === tab));
+            loadNormalTasks();
+        }
+        function switchStatDim(dim) {
+            currentStatDim = dim;
+            document.querySelectorAll('#subTabsStat .sub-tab').forEach(el =>
+                el.classList.toggle('active', el.dataset.dim === dim));
+            statPage = 1;
+            loadStatistics();
+        }
+
+        /* ---------------- 关键字搜索（客户端，按当前年份范围） ---------------- */
+        var searchKw = '';
+        var searchTimer = null;
+        function bindSearch() {
+            var inp = document.getElementById('taskSearch');
+            if (!inp) return;
+            inp.addEventListener('input', onSearchInput);
+            inp.addEventListener('search', onSearchInput);
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') { e.preventDefault(); resetSearchUI(); loadNormalTasks(); }
+            });
+        }
+        function onSearchInput() {
+            var inp = document.getElementById('taskSearch');
+            var v = ((inp && inp.value) || '').trim();
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () { applyTaskSearch(v); }, 300); // 防抖 300ms
+        }
+        function resetSearchUI() {
+            searchKw = '';
+            clearTimeout(searchTimer);
+            var inp = document.getElementById('taskSearch');
+            if (inp && inp.value) inp.value = '';
+            var bar = document.getElementById('searchResultBar');
+            if (bar) { bar.hidden = true; bar.innerHTML = ''; }
+        }
+        async function applyTaskSearch(kw) {
+            searchKw = kw;
+            if (!kw) { resetSearchUI(); loadNormalTasks(); return; }
+            if (currentNav !== 'normal') switchNav('normal', true);
+            var box = document.getElementById('normalTaskList');
+            box.innerHTML = '<div class="loading-tip">搜索中…</div>';
+            document.getElementById('normalTaskPagination').innerHTML = '';
+            var r = await apiGet('/api/tasks?startDate=' + currentYear + '-01-01&endDate=' + currentYear + '-12-31');
+            var list = (r.code === 200 && Array.isArray(r.data)) ? r.data : [];
+            var k = kw.toLowerCase();
+            var matched = list.filter(function (t) {
+                return (t.title && String(t.title).toLowerCase().indexOf(k) >= 0)
+                    || (t.remark && String(t.remark).toLowerCase().indexOf(k) >= 0);
+            });
+            if (searchKw !== kw) return; // 已被更新的输入覆盖
+            var bar = document.getElementById('searchResultBar');
+            bar.hidden = false;
+            bar.innerHTML = '<span class="search-result-pill"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> “' + escapeHtml(kw) + '” 的结果 <strong>' + matched.length + '</strong> 条</span>'
+                + '<button type="button" class="search-clear" onclick="clearTaskSearch()">清除</button>';
+            renderSearchResults(box, matched, kw);
+        }
+        function renderSearchResults(box, list, kw) {
+            if (!list.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({ size: 'block', icon: EMPTY_ICO.search, text: '未找到与“' + kw + '”匹配的事务' }));
+                return;
+            }
+            box.innerHTML = '<div class="search-result-list">' + list.map(function (t) {
+                var col = t.color || statusColor(t.statusId);
+                return '<button type="button" class="search-result-item" aria-label="打开事务 ' + escapeHtml(t.title) + '"'
+                    + ' onclick="editTask(' + t.id + ')">'
+                    + '<span class="task-color-dot" style="background:' + col + '"></span>'
+                    + '<span class="sr-date">' + (t.date || '—') + '</span>'
+                    + '<span class="sr-title">' + (t.pinned ? '<span class="pinned-tag">置顶</span>' : '') + escapeHtml(t.title) + '</span>'
+                    + '<span class="sr-status" style="color:' + statusColor(t.statusId) + ';">' + escapeHtml(statusName(t.statusId)) + '</span>'
+                    + '</button>';
+            }).join('') + '</div>';
+        }
+        function clearTaskSearch() {
+            resetSearchUI();
+            if (currentNav === 'normal') loadNormalTasks();
+        }
+
+        /* ---------------- 普通事务列表（滚动加载） ---------------- */
+        async function loadNormalTasks() {
+            resetSearchUI();
+            var box = document.getElementById('normalTaskList');
+            var ps = pageState[currentNormalTab];
+            ps.page = 1;
+            normalLoaded = [];
+            normalHasMore = false;
+            normalLoading = false;
+            box.innerHTML = '<div class="loading-tip">加载中…</div>';
+            var pagHost = document.getElementById('normalTaskPagination');
+            if (pagHost) pagHost.innerHTML = '';
+            await fetchNormalPage(true);
+        }
+        // 拉取一页普通事务；reset=true 为首次/换条件（重置累积），false 为上拉加载更多（追加）
+        async function fetchNormalPage(reset) {
+            if (normalLoading) return;
+            normalLoading = true;
+            if (!reset) {
+                var s0 = document.getElementById('normalSentinel');
+                if (s0) s0.textContent = '加载中…';
+            }
+            var ps = pageState[currentNormalTab];
+            var url = '/api/tasks?page=' + ps.page + '&size=' + NORMAL_PAGE_SIZE;
+            if (currentNormalTab === 'today') {
+                url += '&date=' + selectedDate;
+            } else {
+                url += '&month=' + currentYear + '-' + pad2(currentMonth);
+            }
+            var r = await apiGet(url);
+            normalLoading = false;
+            if (!r || r.code !== 200) {
+                if (reset) {
+                    var errBox = document.getElementById('normalTaskList');
+                    errBox.innerHTML = '';
+                    errBox.appendChild(uiEmpty({ size: 'block', text: '加载失败，请刷新重试' }));
+                }
+                normalHasMore = false;
+                return;
+            }
+            // 兼容两种返回：新契约 {list,total,hasMore} 或旧的裸数组
+            var list, total = 0, hasMore = false;
+            if (Array.isArray(r.data)) { list = r.data; total = list.length; hasMore = false; }
+            else { list = r.data.list || []; total = r.data.total || list.length; hasMore = !!r.data.hasMore; }
+            ps.total = total;
+            normalHasMore = hasMore;
+            if (reset) {
+                // 首屏 / 切条件：全量重建
+                normalLoaded = list;
+                renderNormalList();
+            } else {
+                // 上拉加载：只把新页行数的行插到哨兵前，不重建已累积列表（FIX-32）
+                normalLoaded = normalLoaded.concat(list);
+                appendNormalRows(list);
+            }
+            setupNormalSentinel();
+        }
+        /* 从首页「今天要处理」跳转而来（/tasks?hl=<taskId>）：滚动定位并高亮该事务 */
+        var hlTaskId = (function () { var m = (location.search || '').match(/[?&]hl=(\d+)/); return m ? parseInt(m[1], 10) : 0; })();
+        function hlLocate() {
+            if (!hlTaskId) return;
+            var el = document.querySelector('.task-item[data-id="' + hlTaskId + '"]');
+            if (!el) return;
+            try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(true); }
+            el.classList.add('hl-flash');
+            setTimeout(function () { el.classList.remove('hl-flash'); }, 2600);
+            hlTaskId = 0;
+        }
+        function taskRowHtml(t) {
+            var pinnedMark = t.pinned ? '<span class="pinned-tag">置顶</span>' : '';
+            var col = t.color || statusColor(t.statusId);
+            return '<div class="task-item' + (t.statusId === 3 ? ' done' : '') + '" data-id="' + t.id + '">'
+                + '<span class="task-color-dot" style="background:' + col + '"></span>'
+                + '<div class="task-item-main">'
+                + '<div class="task-name">' + pinnedMark + (t.client ? '<span class="task-client"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>' + escapeHtml(t.client) + '</span>' : '') + memberChipOf(t.memberId) + escapeHtml(t.title) + '</div>'
+                + '<div class="task-sub">'
+                + '<span class="task-date">' + (t.date || '—') + '</span>'
+                + (t.remindTime ? '<span class="task-time">⏰ ' + t.remindTime + '</span>' : '')
+                + (t.nextAction ? '<span class="task-next">→ ' + escapeHtml(t.nextAction) + '</span>' : '')
+                + (t.remark ? '<span class="task-remark">' + escapeHtml(t.remark) + '</span>' : '')
+                + '</div></div>'
+                + '<span class="status-tag" style="background:' + statusColor(t.statusId) + '18;color:' + statusColor(t.statusId) + ';">'
+                + '<span class="dot" style="background:' + statusColor(t.statusId) + '"></span>' + escapeHtml(statusName(t.statusId)) + '</span>'
+                + '<div class="task-actions">'
+                + (t.statusId !== 3 ? '<button class="icon-btn" title="标记完成" aria-label="标记完成" onclick="quickDone(' + t.id + ',' + t.statusId + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>' : '')
+                + '<button class="icon-btn" title="转为循环事务" aria-label="转为循环事务" onclick="toScheduled(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>'
+                + '<button class="icon-btn" title="编辑" aria-label="编辑" onclick="editTask(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+                + '<button class="icon-btn danger" title="删除" aria-label="删除" onclick="removeTask(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>'
+                + '</div></div>';
+        }
+        function sentinelFoot() {
+            return normalHasMore
+                ? '↓ 上拉加载更多（已加载 ' + normalLoaded.length + ' 条）'
+                : '— 已全部加载（共 ' + normalLoaded.length + ' 条）—';
+        }
+        function renderNormalList() {
+            var box = document.getElementById('normalTaskList');
+            if (!normalLoaded.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({
+                    size: 'block', icon: EMPTY_ICO.clipboard,
+                    text: currentNormalTab === 'today' ? '当天暂无事务，点击右上角「+ 添加事务」' : '当月暂无事务'
+                }));
+                return;
+            }
+            box.innerHTML = normalLoaded.map(taskRowHtml).join('')
+                + '<div id="normalSentinel" style="padding:12px;text-align:center;font-size:12.5px;color:var(--text-secondary);">' + sentinelFoot() + '</div>';
+            hlLocate();
+        }
+        // 上拉加载：仅把新页行片段插入哨兵前，避免每次翻页 map+重写全部已累积行（FIX-32）
+        function appendNormalRows(list) {
+            if (!list || !list.length) return;
+            var box = document.getElementById('normalTaskList');
+            var frag = document.createRange().createContextualFragment(list.map(taskRowHtml).join(''));
+            var sentinel = document.getElementById('normalSentinel');
+            if (sentinel && sentinel.parentNode === box) box.insertBefore(frag, sentinel);
+            else box.appendChild(frag);
+            var s = document.getElementById('normalSentinel');
+            if (s) s.textContent = sentinelFoot();
+            hlLocate();
+        }
+        // 哨兵进入视口即触发下一页（rootMargin 提前 300px 预加载）
+        function setupNormalSentinel() {
+            if (normalObserver) { try { normalObserver.disconnect(); } catch (e) { normalObserver = null; } }
+            if (!normalHasMore || searchKw) return;
+            var sentinel = document.getElementById('normalSentinel');
+            if (!sentinel) return;
+            if (!('IntersectionObserver' in window)) {
+                window.addEventListener('scroll', onNormalScrollNearBottom, { passive: true });
+                return;
+            }
+            normalObserver = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) { if (en.isIntersecting) onNormalScrollNearBottom(); });
+            }, { rootMargin: '300px' });
+            normalObserver.observe(sentinel);
+        }
+        function onNormalScrollNearBottom() {
+            if (currentNav !== 'normal' || searchKw) return;
+            if (normalLoading || !normalHasMore) return;
+            var ps = pageState[currentNormalTab];
+            ps.page = ps.page + 1;
+            fetchNormalPage(false);
+        }
+
+        /* ---------------- 置顶事务列表 ---------------- */
+        async function loadPinnedTasks() {
+            var box = document.getElementById('pinnedTaskList');
+            var ps = pageState.pinned;
+            box.innerHTML = '<div class="loading-tip">加载中…</div>';
+            var r = await apiGet('/api/tasks?pinned=1&page=' + ps.page + '&pageSize=' + ps.size);
+            if (r.code !== 200) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({ size: 'block', text: '加载失败，请刷新重试' }));
+                return;
+            }
+            var list = r.data, total = 0;
+            if (Array.isArray(list)) {
+                list = list.filter(t => t.pinned);
+                total = list.length;
+            } else { list = r.data.list || []; total = r.data.total || list.length; }
+            ps.total = total;
+            renderTaskList(box, list, 'pinnedTaskPagination', ps, total, 'pinnedTaskList');
+        }
+
+        function renderTaskList(box, list, pagId, ps, total, listId) {
+            if (!list.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({
+                    size: 'block', icon: EMPTY_ICO.clipboard,
+                    text: currentNav === 'pinned' ? '暂无置顶事务' : (currentNormalTab === 'today' ? '当天暂无事务，点击右上角「+ 添加事务」' : '当月暂无事务')
+                }));
+                document.getElementById(pagId).innerHTML = '';
+                return;
+            }
+            box.innerHTML = list.map(function (t) {
+                var pinnedMark = t.pinned ? '<span class="pinned-tag">置顶</span>' : '';
+                var col = t.color || statusColor(t.statusId);
+                return '<div class="task-item' + (t.statusId === 3 ? ' done' : '') + '" data-id="' + t.id + '">'
+                    + '<span class="task-color-dot" style="background:' + col + '"></span>'
+                    + '<div class="task-item-main">'
+                    + '<div class="task-name">' + pinnedMark + (t.client ? '<span class="task-client"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>' + escapeHtml(t.client) + '</span>' : '') + memberChipOf(t.memberId) + escapeHtml(t.title) + '</div>'
+                    + '<div class="task-sub">'
+                    + '<span class="task-date">' + (t.date || '—') + (currentNav === 'pinned' && t.date ? ' ' + weekCN(new Date(t.date + 'T00:00:00')) : '') + '</span>'
+                    + (t.remindTime ? '<span class="task-time">⏰ ' + t.remindTime + '</span>' : '')
+                    + (t.nextAction ? '<span class="task-next">→ ' + escapeHtml(t.nextAction) + '</span>' : '')
+                    + (t.remark ? '<span class="task-remark">' + escapeHtml(t.remark) + '</span>' : '')
+                    + '</div></div>'
+                    + '<span class="status-tag" style="background:' + statusColor(t.statusId) + '18;color:' + statusColor(t.statusId) + ';">'
+                    + '<span class="dot" style="background:' + statusColor(t.statusId) + '"></span>' + escapeHtml(statusName(t.statusId)) + '</span>'
+                    + '<div class="task-actions">'
+                    + (t.statusId !== 3 ? '<button class="icon-btn" title="标记完成" aria-label="标记完成" onclick="quickDone(' + t.id + ',' + t.statusId + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg></button>' : '')
+                    + '<button class="icon-btn" title="转为循环事务" aria-label="转为循环事务" onclick="toScheduled(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>'
+                + '<button class="icon-btn" title="编辑" aria-label="编辑" onclick="editTask(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>'
+                    + '<button class="icon-btn danger" title="删除" aria-label="删除" onclick="removeTask(' + t.id + ')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>'
+                    + '</div></div>';
+            }).join('');
+            renderPagination(pagId, ps, total, function (p) {
+                ps.page = p;
+                if (listId === 'normalTaskList') loadNormalTasks(); else loadPinnedTasks();
+            });
+            hlLocate();
+        }
+
+        function renderPagination(hostId, ps, total, onGo) {
+            var host = document.getElementById(hostId);
+            if (!host) return;
+            var pages = Math.max(1, Math.ceil(total / ps.size));
+            if (pages <= 1) { host.innerHTML = ''; return; }
+            var h = '<div class="pagination">';
+            h += '<button class="page-btn" ' + (ps.page <= 1 ? 'disabled' : '') + ' onclick="__goPage(' + (ps.page - 1) + ')">上一页</button>';
+            var s = Math.max(1, ps.page - 2), e = Math.min(pages, s + 4);
+            for (var i = s; i <= e; i++) {
+                h += '<button class="page-btn' + (i === ps.page ? ' active' : '') + '" onclick="__goPage(' + i + ')">' + i + '</button>';
+            }
+            h += '<button class="page-btn" ' + (ps.page >= pages ? 'disabled' : '') + ' onclick="__goPage(' + (ps.page + 1) + ')">下一页</button>';
+            h += '<span class="page-info">共 ' + total + ' 条 / ' + pages + ' 页</span></div>';
+            host.innerHTML = h;
+            window.__goPage = function (p) {
+                if (p < 1 || p > pages) return;
+                ps.page = p;
+                onGo(p);
+            };
+        }
+
+        /* ---------------- 统计 ---------------- */
+        function statRange() {
+            var y = currentYear, m = currentMonth;
+            var pad = pad2;
+            var start, end;
+            // 统计锚点统一为日历视口：day/week 以「选中日期」为基准
+            var anchor = selectedDate || todayStr();
+            var base = new Date(anchor + 'T00:00:00');
+            if (currentStatDim === 'day') {
+                start = end = anchor;
+            } else if (currentStatDim === 'week') {
+                var wd = base.getDay() === 0 ? 7 : base.getDay();
+                var mon = new Date(base.getTime() - (wd - 1) * 86400000);
+                var sun = new Date(mon.getTime() + 6 * 86400000);
+                start = mon.getFullYear() + '-' + pad(mon.getMonth() + 1) + '-' + pad(mon.getDate());
+                end = sun.getFullYear() + '-' + pad(sun.getMonth() + 1) + '-' + pad(sun.getDate());
+            } else if (currentStatDim === 'month') {
+                start = y + '-' + pad(m) + '-01';
+                end = y + '-' + pad(m) + '-' + new Date(y, m, 0).getDate();
+            } else if (currentStatDim === 'quarter') {
+                var q = Math.floor((m - 1) / 3);
+                var sm = q * 3 + 1, em = sm + 2;
+                start = y + '-' + pad(sm) + '-01';
+                end = y + '-' + pad(em) + '-' + new Date(y, em, 0).getDate();
+            } else {
+                start = y + '-01-01';
+                end = y + '-12-31';
+            }
+            return { start: start, end: end };
+        }
+
+        function statRangeText(rg) {
+            if (currentStatDim === 'day') return rg.start;
+            if (currentStatDim === 'week') return rg.start + ' ~ ' + rg.end;
+            if (currentStatDim === 'month') return currentYear + ' 年 ' + currentMonth + ' 月';
+            if (currentStatDim === 'quarter') return currentYear + ' 年 第 ' + (Math.floor((currentMonth - 1) / 3) + 1) + ' 季度';
+            return currentYear + ' 年全年';
+        }
+
+        async function loadStatistics() {
+            var rg = statRange();
+            var r = await apiGet('/api/tasks?startDate=' + rg.start + '&endDate=' + rg.end);
+            var list = (r.code === 200 && Array.isArray(r.data)) ? r.data : [];
+            statTasks = list;
+            var rangeEl = document.getElementById('statRangeLabel');
+            if (rangeEl) rangeEl.innerHTML = '统计范围：<strong>' + escapeHtml(statRangeText(rg)) + '</strong>';
+            document.getElementById('statTotal').textContent = list.length;
+            document.getElementById('statPending').textContent = list.filter(t => t.statusId === 1).length;
+            document.getElementById('statProgress').textContent = list.filter(t => t.statusId === 2).length;
+            document.getElementById('statDone').textContent = list.filter(t => t.statusId === 3).length;
+            document.getElementById('detailCount').textContent = list.length;
+            statPage = 1;
+            renderStatDetail();
+        }
+
+        function renderStatDetail() {
+            var box = document.getElementById('taskDetailList');
+            var host = document.getElementById('taskDetailPagination');
+            if (!statTasks.length) {
+                box.innerHTML = '';
+                box.appendChild(uiEmpty({ size: 'block', icon: EMPTY_ICO.chart, text: '该时间段内暂无事务数据' }));
+                host.innerHTML = '';
+                return;
+            }
+            var pages = Math.max(1, Math.ceil(statTasks.length / statPageSize));
+            if (statPage > pages) statPage = pages;
+            var slice = statTasks.slice((statPage - 1) * statPageSize, statPage * statPageSize);
+            box.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr>'
+                + '<th style="width:110px;">日期</th><th>事务名称</th><th style="width:90px;">时间</th>'
+                + '<th style="width:100px;">状态</th><th style="width:170px;">备注</th></tr></thead><tbody>'
+                + slice.map(t => '<tr>'
+                    + '<td>' + (t.date || '—') + '</td>'
+                    + '<td>' + (t.pinned ? '<span class="pinned-tag">置顶</span>' : '') + escapeHtml(t.title) + '</td>'
+                    + '<td>' + (t.remindTime || '—') + '</td>'
+                    + '<td><span class="status-tag" style="background:' + statusColor(t.statusId) + '18;color:' + statusColor(t.statusId) + ';">'
+                    + '<span class="dot" style="background:' + statusColor(t.statusId) + '"></span>' + escapeHtml(statusName(t.statusId)) + '</span></td>'
+                    + '<td class="muted">' + escapeHtml(t.remark || '—') + '</td>'
+                    + '</tr>').join('')
+                + '</tbody></table></div>';
+            var h = '<div class="pagination">';
+            h += '<button class="page-btn" ' + (statPage <= 1 ? 'disabled' : '') + ' onclick="__statGo(' + (statPage - 1) + ')">上一页</button>';
+            for (var i = 1; i <= pages; i++) {
+                if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - statPage) > 1) {
+                    if (i === 3) h += '<span class="page-info">…</span>';
+                    continue;
+                }
+                h += '<button class="page-btn' + (i === statPage ? ' active' : '') + '" onclick="__statGo(' + i + ')">' + i + '</button>';
+            }
+            h += '<button class="page-btn" ' + (statPage >= pages ? 'disabled' : '') + ' onclick="__statGo(' + (statPage + 1) + ')">下一页</button>';
+            h += '<span class="page-info">共 ' + statTasks.length + ' 条</span></div>';
+            host.innerHTML = h;
+            window.__statGo = function (p) {
+                if (p < 1 || p > pages) return;
+                statPage = p; renderStatDetail();
+            };
+        }
+
+        /* ---------------- 新增 / 编辑事务 ---------------- */
+        /* ---------------- 表单字段级校验 ---------------- */
+        function validateTitleField() {
+            return validateField(document.getElementById('tTitle'), { required: true, emptyMsg: '请输入事务名称' });
+        }
+        function validateDateField() {
+            var el = document.getElementById('tDate');
+            if (editingPinned) { clearFieldError(el); return true; }
+            return validateField(el, { required: true, emptyMsg: '请选择日期' });
+        }
+        function validateTaskForm() {
+            var okTitle = validateTitleField();
+            var okDate = validateDateField();
+            if (!okTitle) { document.getElementById('tTitle').focus(); return false; }
+            if (!okDate) { document.getElementById('tDate').focus(); return false; }
+            return true;
+        }
+        function bindTaskFormValidation() {
+            var ti = document.getElementById('tTitle');
+            var di = document.getElementById('tDate');
+            if (ti) {
+                ti.addEventListener('blur', validateTitleField);
+                ti.addEventListener('input', function () { clearFieldError(ti); });
+            }
+            if (di) {
+                di.addEventListener('blur', validateDateField);
+                di.addEventListener('change', function () { clearFieldError(di); });
+            }
+        }
+
+        function switchTaskType(type) {
+            editingPinned = type === 'pinned';
+            document.querySelectorAll('#taskTypeTabs .task-type-tab').forEach(el =>
+                el.classList.toggle('active', el.dataset.type === type));
+            var hideDate = type === 'pinned';
+            document.getElementById('tDate').parentElement.style.opacity = hideDate ? '.55' : '1';
+            document.getElementById('tRemindTime').parentElement.style.opacity = hideDate ? '.55' : '1';
+            document.getElementById('dateRequired').textContent = hideDate ? '(可选)' : '*';
+            if (hideDate) clearFieldError(document.getElementById('tDate'));
+        }
+        /* 语音 AI 建单：接收 common.js voiceAiFill 的解析结果 */
+        window.applyVoiceFill = function (kind, data) {
+            if (kind !== 'tasks' || !data) return;
+            if (data.title) document.getElementById('tTitle').value = String(data.title).slice(0, 60);
+            if (data.date) document.getElementById('tDate').value = data.date;
+            if (data.remindTime) document.getElementById('tRemindTime').value = data.remindTime;
+            if (data.remark) document.getElementById('tRemark').value = String(data.remark).slice(0, 500);
+            showToast('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg> 已按语音填写，请确认后保存');
+        };
+
+        function showAddTaskModal() {
+            editingId = null;
+            document.getElementById('taskModalTitle').textContent = '新增事务';            document.getElementById('tTitle').value = '';
+            document.getElementById('tDate').value = selectedDate || todayStr();
+            document.getElementById('tRemindTime').value = '';
+            document.getElementById('tStatus').value = '1';
+            document.getElementById('tColor').value = '';
+            document.getElementById('tRemark').value = '';
+            document.getElementById('tClient').value = '';
+            document.getElementById('tNextAction').value = '';
+            // P1-1：支持从「家庭成员」跳转 ?memberId=<id> 直接预填
+            var sMember = document.getElementById('tMember');
+            if (sMember) sMember.value = memberPrefillId ? String(memberPrefillId) : '';
+            clearFieldError(document.getElementById('tTitle'));
+            clearFieldError(document.getElementById('tDate'));
+            switchTaskType(currentNav === 'pinned' ? 'pinned' : 'normal');
+            openModal('taskModal');
+        }
+        /* 双击日历格：切换到该日并直接弹新建弹窗（日期已预填） */
+        function quickAddTask(date) {
+            gotoDate(date);
+            showAddTaskModal();
+        }
+        async function editTask(id) {
+            var r = await apiGet('/api/tasks/' + id);
+            if (r.code !== 200) return showToast('加载失败', 'error');
+            var t = r.data;
+            editingId = id;
+            document.getElementById('taskModalTitle').textContent = '编辑事务';
+            document.getElementById('tTitle').value = t.title;
+            document.getElementById('tDate').value = t.date || '';
+            document.getElementById('tRemindTime').value = t.remindTime || '';
+            document.getElementById('tStatus').value = t.statusId;
+            document.getElementById('tColor').value = t.color || '';
+            document.getElementById('tRemark').value = t.remark || '';
+            document.getElementById('tClient').value = t.client || '';
+            document.getElementById('tNextAction').value = t.nextAction || '';
+            var sMember = document.getElementById('tMember');
+            if (sMember) sMember.value = t.memberId ? String(t.memberId) : '';
+            switchTaskType(t.pinned ? 'pinned' : 'normal');
+            clearFieldError(document.getElementById('tTitle'));
+            clearFieldError(document.getElementById('tDate'));
+            openModal('taskModal');
+            window.__editPinned = !!t.pinned;
+        }
+        async function saveTask() {
+            var data = {
+                title: document.getElementById('tTitle').value.trim(),
+                date: document.getElementById('tDate').value,
+                remindTime: document.getElementById('tRemindTime').value,
+                statusId: +document.getElementById('tStatus').value,
+                color: document.getElementById('tColor').value,
+                remark: document.getElementById('tRemark').value,
+                client: document.getElementById('tClient').value.trim(),
+                nextAction: document.getElementById('tNextAction').value.trim(),
+                memberId: (document.getElementById('tMember') || {}).value || null,
+                pinned: editingPinned
+            };
+            if (!validateTaskForm()) return;
+            if (!data.date) data.date = editingPinned ? todayStr() : selectedDate;
+            var r = editingId ? await apiPut('/api/tasks/' + editingId, data) : await apiPost('/api/tasks', data);
+            if (r.code === 200) {
+                showToast(editingId ? '更新成功' : '创建成功');
+                closeModal('taskModal');
+                refreshMonth().then(renderCalendar);
+                if (currentNav === 'normal') loadNormalTasks();
+                else if (currentNav === 'pinned') loadPinnedTasks();
+                else loadStatistics();
+            } else showToast(r.message || '保存失败', 'error');
+        }
+        function reloadTaskViews() {
+            refreshMonth().then(renderCalendar);
+            if (currentNav === 'normal') loadNormalTasks();
+            else if (currentNav === 'pinned') loadPinnedTasks();
+            else loadStatistics();
+        }
+        async function quickDone(id, prevStatusId) {
+            var r = await apiPut('/api/tasks/' + id, { statusId: 3 });
+            if (r.code === 200) {
+                showToast('已完成 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>', 'success', {
+                    actionLabel: '撤销',
+                    onAction: async function () {
+                        var back = (prevStatusId && prevStatusId !== 3) ? prevStatusId : 1;
+                        var r2 = await apiPut('/api/tasks/' + id, { statusId: back });
+                        if (r2.code === 200) { showToast('已撤销'); reloadTaskViews(); }
+                    }
+                });
+                reloadTaskViews();
+            }
+        }
+        async function removeTask(id) {
+            if (!(await confirmDel('确定删除该事务吗？'))) return;
+            var r = await apiDelete('/api/tasks/' + id);
+            if (r.code === 200) {
+                showToast('删除成功');
+                refreshMonth().then(renderCalendar);
+                if (currentNav === 'normal') loadNormalTasks();
+                else if (currentNav === 'pinned') loadPinnedTasks();
+                else loadStatistics();
+            }
+        }
+
+        /* ---------------- Excel 导入 ---------------- */
+        function openTaskImportModal() {
+            importParsedRows = [];
+            document.getElementById('taskImportFileName').textContent = '未选择文件';
+            document.getElementById('taskImportResult').style.display = 'none';
+            document.getElementById('taskImportResult').innerHTML = '';
+            document.getElementById('taskImportStartBtn').disabled = true;
+            document.getElementById('taskImportFileInput').value = '';
+            openModal('taskImportModal');
+        }
+        function closeTaskImportModal() { closeModal('taskImportModal'); }
+        function downloadTaskTemplate() {
+            var csv = '\uFEFF事务名称,日期(YYYY-MM-DD),提醒时间(HH:mm),状态,颜色,备注\n'
+                + '示例：提交周报,' + todayStr() + ',09:00,待处理,#3b82f6,周五前完成\n'
+                + '示例：缴纳物业费,' + todayStr() + ',14:30,进行中,#f59e0b,\n';
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '一次性事务导入模板.csv';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+        }
+        function handleTaskImportFile(file) {
+            if (!file) return;
+            document.getElementById('taskImportFileName').textContent = file.name;
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                var text = String(ev.target.result || '');
+                importParsedRows = parseImportText(text);
+                var box = document.getElementById('taskImportResult');
+                box.style.display = 'block';
+                if (!importParsedRows.length) {
+                    box.innerHTML = '<div class="import-tip error">未解析到有效数据，请检查文件（第一行为表头，第二行起为数据）</div>';
+                    document.getElementById('taskImportStartBtn').disabled = true;
+                    return;
+                }
+                var over = importParsedRows.length > 500;
+                box.innerHTML = '<div class="import-tip">已解析 <strong>' + importParsedRows.length + '</strong> 条数据'
+                    + (over ? '，超出单次上限 500 条，将只导入前 500 条' : '') + '</div>'
+                    + '<table class="data-table" style="margin-top:10px;"><thead><tr><th>事务名称</th><th>日期</th><th>时间</th><th>状态</th></tr></thead><tbody>'
+                    + importParsedRows.slice(0, 8).map(r => '<tr><td>' + escapeHtml(r.title) + '</td><td>' + r.date + '</td><td>' + (r.remindTime || '—') + '</td><td>' + escapeHtml(r.statusName || '') + '</td></tr>').join('')
+                    + (importParsedRows.length > 8 ? '<tr><td colspan="4" class="muted">… 其余 ' + (importParsedRows.length - 8) + ' 条</td></tr>' : '')
+                    + '</tbody></table>';
+                document.getElementById('taskImportStartBtn').disabled = false;
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+        /** 解析 CSV / 制表符文本 */
+        function parseImportText(text) {
+            text = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+            var lines = text.split('\n').filter(l => l.trim() !== '');
+            if (lines.length < 2) return [];
+            var rows = [];
+            for (var i = 1; i < lines.length; i++) {
+                var cols = lines[i].split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim());
+                var title = cols[0];
+                if (!title) continue;
+                var dateRaw = cols[1] || '';
+                var date = normalizeDate(dateRaw);
+                var time = (cols[2] || '').trim();
+                var st = (cols[3] || '').trim();
+                var color = (cols[4] || '').trim();
+                var remark = (cols[5] || '').trim();
+                var sid = statuses.find(s => s.name === st);
+                rows.push({
+                    title: title, date: date || selectedDate || todayStr(),
+                    remindTime: /^\d{1,2}:\d{2}/.test(time) ? time : '',
+                    statusId: sid ? sid.id : 1, statusName: st || statusName(1),
+                    color: color, remark: remark
+                });
+                if (rows.length >= 500) break;
+            }
+            return rows;
+        }
+        function normalizeDate(s) {
+            s = String(s || '').trim().replace(/[年月\/\.]/g, '-').replace(/日/g, '');
+            var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (m) return m[1] + '-' + pad2(m[2]) + '-' + pad2(m[3]);
+            var d = new Date(s);
+            if (!isNaN(d.getTime())) return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+            return '';
+        }
+        async function startTaskImport() {
+            if (!importParsedRows.length) return;
+            var btn = document.getElementById('taskImportStartBtn');
+            btn.disabled = true; btn.textContent = '导入中…';
+            var okCount = 0, failCount = 0;
+            for (var i = 0; i < importParsedRows.length; i++) {
+                var r = await apiPost('/api/tasks', importParsedRows[i]);
+                if (r.code === 200) okCount++; else failCount++;
+            }
+            btn.textContent = '开始导入';
+            document.getElementById('taskImportResult').innerHTML =
+                '<div class="import-tip"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> 导入完成：成功 <strong>' + okCount + '</strong> 条'
+                + (failCount ? '，失败 <strong>' + failCount + '</strong> 条' : '') + '</div>';
+            showToast('导入完成：成功 ' + okCount + ' 条');
+            setTimeout(function () {
+                closeTaskImportModal();
+                refreshMonth().then(renderCalendar);
+                if (currentNav === 'normal') loadNormalTasks(); else if (currentNav === 'pinned') loadPinnedTasks();
+            }, 900);
+        }
+
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        init();
+    </script>
+</body>
+</html>
